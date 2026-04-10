@@ -5,7 +5,7 @@ import SQLiteData
 protocol HabitDataStoreProtocol: Sendable {
     func create(_ habit: Habit) throws
     func update(_ habit: Habit) throws
-    func delete(id: UUID) throws
+    func delete(id: Habit.ID) throws
     func upsert(_ habit: Habit) throws
 }
 
@@ -24,7 +24,7 @@ struct HabitDataStore: HabitDataStoreProtocol, Sendable {
         }
     }
 
-    func delete(id: UUID) throws {
+    func delete(id: Habit.ID) throws {
         @Dependency(\.defaultDatabase) var database
         try database.write { db in
             try Habit.where { $0.id.eq(id) }.delete().execute(db)

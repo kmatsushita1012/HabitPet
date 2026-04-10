@@ -30,14 +30,16 @@ enum HabitEventSource: String, CaseIterable, Sendable, Codable, QueryBindable {
 
 @Table
 struct Habit: Sendable, Identifiable {
-    var id: UUID
+    typealias ID = UUID
+
+    var id: Habit.ID
     var name: String
-    var modeRaw: String
-    var characterIDRaw: String
-    var countUnitRaw: String
-    var baselineSourceRaw: String
+    var mode: HabitMode
+    var characterID: String
+    var countUnit: HabitCountUnit
+    var baselineSource: HabitBaselineSource
     var baselineManualValue: Double?
-    var goalTypeRaw: String
+    var goalType: HabitGoalType
     var goalValue: Int?
     var goalDate: String?
     var isArchived: Bool
@@ -48,10 +50,12 @@ struct Habit: Sendable, Identifiable {
 
 @Table
 struct HabitEvent: Sendable, Identifiable {
-    var id: UUID
-    var habitID: UUID
+    typealias ID = UUID
+
+    var id: HabitEvent.ID
+    var habitID: Habit.ID
     var delta: Int
-    var sourceRaw: String
+    var source: HabitEventSource
     var occurredAt: Date
     var revokedAt: Date?
     var createdAt: Date
@@ -61,33 +65,33 @@ struct HabitEvent: Sendable, Identifiable {
 struct HabitRecentEventSelection: Sendable, Identifiable {
     var event: HabitEvent
 
-    var id: UUID { event.id }
+    var id: HabitEvent.ID { event.id }
 }
 
 @Selection
 struct HabitTodayUsageSelection: Sendable, Identifiable {
-    var habitID: UUID
+    var habitID: Habit.ID
     var todayUsage: Int
 
-    var id: UUID { habitID }
+    var id: Habit.ID { habitID }
 }
 
 @Selection
 struct HabitBaselineSelection: Sendable, Identifiable {
-    var habitID: UUID
+    var habitID: Habit.ID
     var baseline: Double
 
-    var id: UUID { habitID }
+    var id: Habit.ID { habitID }
 }
 
 @Selection
 struct HabitStateSelection: Sendable, Identifiable {
-    var habitID: UUID
+    var habitID: Habit.ID
     var stateLevel: Int
     var baseline: Double
     var todayUsage: Int
 
-    var id: UUID { habitID }
+    var id: Habit.ID { habitID }
 }
 
 @Selection
@@ -96,5 +100,5 @@ struct HabitCardSelection: Sendable, Identifiable {
     var todayUsage: Int
     var stateLevel: Int
 
-    var id: UUID { habit.id }
+    var id: Habit.ID { habit.id }
 }

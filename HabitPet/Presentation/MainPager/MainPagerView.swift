@@ -10,18 +10,44 @@ struct MainPagerView: View {
             Group {
                 if viewModel.habits.isEmpty {
                     ContentUnavailableView(
-                        "No Habits Yet",
+                        "習慣がまだありません",
                         systemImage: "pawprint",
-                        description: Text("Tap + to create your first habit.")
+                        description: Text("右上の + から最初の習慣を作成してください。")
                     )
                 } else {
                     TabView(selection: $viewModel.selectedPageIndex) {
                         ForEach(Array(viewModel.habits.enumerated()), id: \.element.id) { index, habit in
                             VStack(spacing: 12) {
+                                Image("character_\(habit.characterID)_lv\(stateLevel(for: viewModel.quickCount))")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 120, height: 120)
+
                                 Text(habit.name)
                                     .font(.title2.bold())
-                                Text("character: \(habit.characterIDRaw)")
+                                Text("キャラクター: \(habit.characterID)")
                                     .foregroundStyle(.secondary)
+
+                                Text("今日のクイック記録: \(viewModel.quickCount)")
+                                    .font(.headline)
+                                    .monospacedDigit()
+
+                                HStack(spacing: 12) {
+                                    Button {
+                                        viewModel.onTapCountUp()
+                                    } label: {
+                                        Label("+1 記録", systemImage: "plus.circle.fill")
+                                    }
+                                    .buttonStyle(.borderedProminent)
+
+                                    Button {
+                                        viewModel.onTapUndoCount()
+                                    } label: {
+                                        Label("取り消し", systemImage: "arrow.uturn.backward.circle")
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .disabled(viewModel.quickCount == 0)
+                                }
                             }
                             .tag(index)
                         }
@@ -35,7 +61,7 @@ struct MainPagerView: View {
             .navigationTitle("HabitPet")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Edit") {
+                    Button("編集") {
                         viewModel.onTapEdit()
                     }
                 }
@@ -47,10 +73,48 @@ struct MainPagerView: View {
                     }
                 }
             }
+            .alert("エラー", isPresented: .constant(viewModel.errorMessage != nil)) {
+                Button("OK") {
+                    viewModel.errorMessage = nil
+                }
+            } message: {
+                Text(viewModel.errorMessage ?? "")
+            }
         }
         .onAppear {
             viewModel.onAppear()
         }
+        .sheet(
+            isPresented: $viewModel.isCreatePresented,
+            onDismiss: { viewModel.onDismissCreate() }
+        ) {
+            HabitEditView(viewModel: HabitEditViewModel(habit: nil))
+        }
+        .sheet(
+            isPresented: $viewModel.isEditPresented,
+            onDismiss: { viewModel.onDismissEdit() }
+        ) {
+            if let habit = viewModel.editingHabit {
+                HabitEditView(viewModel: HabitEditViewModel(habit: habit))
+            } else {
+                ContentUnavailableView("No habit selected", systemImage: "exclamationmark.circle")
+            }
+        }
+    }
+}
+
+private func stateLevel(for count: Int) -> Int {
+    switch count {
+    case ..<5:
+        return 1
+    case ..<10:
+        return 2
+    case ..<20:
+        return 3
+    case ..<30:
+        return 4
+    default:
+        return 5
     }
 }
 

@@ -5,8 +5,8 @@ import SQLiteData
 protocol HabitEventDataStoreProtocol: Sendable {
     func create(_ event: HabitEvent) throws
     func update(_ event: HabitEvent) throws
-    func delete(id: UUID) throws
-    func revokeLast(habitID: UUID, count: Int, now: Date) throws
+    func delete(id: HabitEvent.ID) throws
+    func revokeLast(habitID: Habit.ID, count: Int, now: Date) throws
 }
 
 struct HabitEventDataStore: HabitEventDataStoreProtocol, Sendable {
@@ -24,14 +24,14 @@ struct HabitEventDataStore: HabitEventDataStoreProtocol, Sendable {
         }
     }
 
-    func delete(id: UUID) throws {
+    func delete(id: HabitEvent.ID) throws {
         @Dependency(\.defaultDatabase) var database
         try database.write { db in
             try HabitEvent.where { $0.id.eq(id) }.delete().execute(db)
         }
     }
 
-    func revokeLast(habitID: UUID, count: Int, now: Date) throws {
+    func revokeLast(habitID: Habit.ID, count: Int, now: Date) throws {
         guard count > 0 else { return }
 
         @Dependency(\.defaultDatabase) var database
