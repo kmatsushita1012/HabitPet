@@ -57,7 +57,9 @@ struct MainPagerView: View {
                 }
                 ToolbarItemGroup(placement: .bottomBar) {
                     Button {
-                        viewModel.onTapPreviousPage() // TODO: アニメーション追加
+                        withAnimation(.snappy) {
+                            viewModel.onTapPreviousPage()
+                        }
                     } label: {
                         Label("前へ", systemImage: "chevron.left")
                     }
@@ -66,7 +68,9 @@ struct MainPagerView: View {
                     Spacer()
 
                     Button {
-                        viewModel.onTapNextPage() // TODO: アニメーション追加
+                        withAnimation(.snappy) {
+                            viewModel.onTapNextPage()
+                        }
                     } label: {
                         Label("次へ", systemImage: "chevron.right")
                     }
@@ -116,58 +120,78 @@ private struct HabitPageCard: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            HStack(spacing: 16) {
-                characterImage(for: habit, totalCount: totalCount)
-                    .aspectRatio(1, contentMode: .fit)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(habit.name ?? habit.kind.title)
-                        .font(.title2.bold())
-                    Text(habit.character.title)
-                        .foregroundStyle(.secondary)
-                    Text("種類: \(habit.kind.title)")
-                        .foregroundStyle(.secondary)
-
-                    Text("今日の記録: \(todayCount)\(habit.kind.unitTitle)")
-                        .font(.headline)
-                        .monospacedDigit()
-                    HStack(spacing: 12) {
-
-                        Button {
-                            onTapUndo()
-                        } label: {
-                            Label("取り消し", systemImage: "arrow.uturn.backward")
-                                .labelStyle(.iconOnly)
-                        }
-                        .tint(.red)
-                        .buttonStyle(.bordered)
-                        .controlSize(.large)
-                        .scaledToFill()
-                        .disabled(totalCount == 0)
-                        
-                        Button {
-                            onTapCountUp()
-                        } label: {
-                            Label("記録", systemImage: "plus")
-                                .labelStyle(.iconOnly)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .scaledToFill()
-                    }
-                }
-                .frame(alignment: .leading)
+            // MARK: レイアウトは変更しないこと
+            HabitCharacterImageView(habit: habit, totalCount: totalCount)
+                .aspectRatio(1, contentMode: .fit)
+            HStack{
+                detailCard
+                HabitStatusView(
+                    todayCount: todayCount,
+                    goalPerDay: habit.goalPerDay,
+                    unit: habit.kind.unitTitle
+                )
+                // TODO: detailCardとHabitStatusViewの内容を統合して整理　より見やすく
             }
+            // TODO: 過去の分析を含めた詳細なAnalyticsView
+        }
 
-            habitAnalytics(todayCount: todayCount, goalPerDay: habit.goalPerDay, unit: habit.kind.unitTitle)
+        
 
-            Spacer(minLength: 0)
+        Spacer(minLength: 0)
+    }
+
+    @ViewBuilder
+    var detailCard: some View {
+        HStack{
+            VStack(alignment: .leading, spacing: 6) {
+                Text(habit.name ?? habit.kind.title)
+                    .font(.title2.bold())
+                Text(habit.character.title)
+                    .foregroundStyle(.secondary)
+                Text("種類: \(habit.kind.title)")
+                    .foregroundStyle(.secondary)
+                Text("今日の記録: \(todayCount)\(habit.kind.unitTitle)")
+                    .font(.headline)
+                    .monospacedDigit()
+                
+                HStack(spacing: 12) {
+                    Button(action: onTapUndo) {
+                        Label("取り消し", systemImage: "arrow.uturn.backward")
+                            .labelStyle(.iconOnly)
+                    }
+                    .tint(.red)
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .disabled(totalCount == 0)
+                    
+                    Button(action: onTapCountUp) {
+                        Label("記録", systemImage: "plus")
+                            .labelStyle(.iconOnly)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                }
+            }
+            .frame(alignment: .leading)
+            .padding(16)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            // 過去にわたっての棒グラフなどを追加
+            // まだViewの1/2ぐらい余っている
         }
     }
-    @ViewBuilder
-    private func habitAnalytics(todayCount: Int, goalPerDay: Int, unit: String) -> some View {
+}
+
+private struct HabitStatusView: View {
+    let todayCount: Int
+    let goalPerDay: Int
+    let unit: String
+
+    var body: some View {
         let remaining = max(goalPerDay - todayCount, 0)
-        VStack(alignment: .leading, spacing: 4) {
+        let progress = goalPerDay > 0 ? min(Double(todayCount) / Double(goalPerDay), 1) : 0
+
+        VStack(alignment: .leading, spacing: 6) {
             Text("進捗")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -175,22 +199,26 @@ private struct HabitPageCard: View {
                 .foregroundStyle(.secondary)
             Text("残り: \(remaining)\(unit)")
                 .monospacedDigit()
+            ProgressView(value: progress)
+                .tint(progress >= 1 ? .red : .accentColor)
+                // TODO: もっと太く
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(.rect(cornerRadius: 8))
+        .frame(alignment: .leading)
+        .padding(16)
+        .background(.ultraThinMaterial)
+        .clipShape(.rect(cornerRadius: 16))
     }
-    // TODO: 棒グラフなどの視覚化を追加
 }
 
+private struct HabitCharacterImageView: View {
+    let habit: Habit
+    let totalCount: Int
 
-
-private func characterImage(for habit: Habit, totalCount: Int) -> some View {
+    var body: some View {
     let level = habitStateLevel(forTotalCount: totalCount)
     let names = habitCharacterAssetNames(kind: habit.kind, character: habit.character, level: level)
 
-    return Group {
+        Group {
         if let image = AppCharacterImageLoader.load(named: names) {
             Image(uiImage: image)
                 .resizable()
@@ -199,6 +227,7 @@ private func characterImage(for habit: Habit, totalCount: Int) -> some View {
             Image(systemName: "pawprint.fill")
                 .resizable()
                 .scaledToFit()
+            }
         }
     }
 }

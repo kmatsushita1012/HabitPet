@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct HabitEditView: View {
     @State private var viewModel: HabitEditViewModel
@@ -12,101 +13,47 @@ struct HabitEditView: View {
         @Bindable var viewModel = viewModel
 
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 12) {
-                    editSection(title: L10n.kindSection) {
-                        Picker(
-                            L10n.kindTitle,
-                            selection: Binding(
-                                get: { viewModel.selectedKind },
-                                set: { viewModel.onChangeKind($0) }
-                            )
-                        ) {
-                            ForEach(HabitKind.allCases, id: \.self) { kind in
-                                Text(kind.title).tag(kind)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    }
+            Form {
+                HabitKindSection(
+                    selectedKind: viewModel.selectedKind,
+                    onChangeKind: { viewModel.onChangeKind($0) }
+                )
 
-                    editSection(title: L10n.characterSection) {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(viewModel.selectableCharacters, id: \.self) { character in
-                                    Button {
-                                        viewModel.onChangeCharacter(character)
-                                    } label: {
-                                        Text(character.title)
-                                            .font(.subheadline.weight(.semibold))
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 8)
-                                            .background(
-                                                viewModel.selectedCharacter == character
-                                                ? Color.accentColor.opacity(0.2)
-                                                : Color(.secondarySystemBackground)
-                                            )
-                                            .clipShape(.rect(cornerRadius: 8))
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel(character.title)
-                                    .accessibilityAddTraits(
-                                        viewModel.selectedCharacter == character ? .isSelected : []
-                                    )
-                                }
-                            }
-                        }
-                    }
+                HabitCharacterSection(
+                    selectedKind: viewModel.selectedKind,
+                    selectedCharacter: viewModel.selectedCharacter,
+                    selectableCharacters: viewModel.selectableCharacters,
+                    onChangeCharacter: { viewModel.onChangeCharacter($0) }
+                )
 
-                    editSection(title: L10n.nameSection) {
-                        TextField(
-                            L10n.namePlaceholder,
-                            text: Binding(
-                                get: { viewModel.nameInput },
-                                set: { viewModel.onChangeName($0) }
-                            )
-                        )
-                    }
+                HabitNameSection(
+                    nameInput: viewModel.nameInput,
+                    onChangeName: { viewModel.onChangeName($0) }
+                )
 
-                    editSection(title: L10n.goalSection) {
-                        DatePicker(
-                            L10n.goalDeadlineTitle,
-                            selection: Binding(
-                                get: { viewModel.goalDeadline },
-                                set: { viewModel.onChangeGoalDeadline($0) }
-                            ),
-                            displayedComponents: [.date]
-                        )
-                        .environment(\.locale, .current)
+                HabitGoalSection(
+                    selectedKind: viewModel.selectedKind,
+                    goalDeadline: viewModel.goalDeadline,
+                    goalPerDayInput: viewModel.goalPerDayInput,
+                    onChangeGoalDeadline: { viewModel.onChangeGoalDeadline($0) },
+                    onChangeGoalPerDay: { viewModel.onChangeGoalPerDay($0) }
+                )
 
-                        LabeledContent("\(L10n.goalPerDayTitle)（\(viewModel.selectedKind.unitTitle)）") {
-                            TextField(
-                                "0",
-                                text: Binding(
-                                    get: { viewModel.goalPerDayInput },
-                                    set: { viewModel.onChangeGoalPerDay($0) }
-                                )
-                            )
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(minWidth: 44)
-                        }
-                    }
+                if viewModel.editingHabit == nil {
+                    HabitYesterdaySection(
+                        selectedKind: viewModel.selectedKind,
+                        yesterdayCountInput: viewModel.yesterdayCountInput,
+                        onChangeYesterdayCount: { viewModel.onChangeYesterdayCount($0) }
+                    )
+                }
 
-                    if viewModel.editingHabit == nil {
-                        yesterdayCountSection(viewModel: viewModel)
-                    }
-
-                    if viewModel.editingHabit != nil {
-                        editSection {
-                            Button(L10n.archiveButton, role: .destructive) {
-                                viewModel.isArchiveAlertPresented = true
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                if viewModel.editingHabit != nil {
+                    Section {
+                        Button(L10n.archiveButton, role: .destructive) {
+                            viewModel.isArchiveAlertPresented = true
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
             }
             .navigationTitle(viewModel.editingHabit == nil ? L10n.newHabitTitle : L10n.editHabitTitle)
             .toolbar {
@@ -155,53 +102,153 @@ struct HabitEditView: View {
     }
 }
 
-@ViewBuilder
-private func yesterdayCountSection(viewModel: HabitEditViewModel) -> some View {
-    let title = "\(L10n.yesterdayCountTitle)（\(viewModel.selectedKind.unitTitle)）"
+private struct HabitKindSection: View {
+    let selectedKind: HabitKind
+    let onChangeKind: (HabitKind) -> Void
 
-    editSection(title: L10n.yesterdaySection, footer: L10n.yesterdayFooter) {
-        LabeledContent(title) {
-            TextField(
-                L10n.yesterdaySimplePlaceholder,
-                text: Binding(
-                    get: { viewModel.yesterdayCountInput },
-                    set: { viewModel.onChangeYesterdayCount($0) }
-                )
-            )
-            .keyboardType(.numberPad)
-            .multilineTextAlignment(.trailing)
-            .frame(minWidth: 44)
+    var body: some View {
+        Section(L10n.kindSection) {
+            Picker(
+                L10n.kindTitle,
+                selection: Binding(get: { selectedKind }, set: onChangeKind)
+            ) {
+                ForEach(HabitKind.allCases, id: \.self) { kind in
+                    Text(kind.title).tag(kind)
+                }
+            }
+            .pickerStyle(.menu)
         }
     }
 }
 
-@ViewBuilder
-private func editSection(
-    title: String? = nil,
-    footer: String? = nil,
-    @ViewBuilder content: () -> some View
-) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-        if let title {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-        }
+private struct HabitCharacterSection: View {
+    let selectedKind: HabitKind
+    let selectedCharacter: CharacterType
+    let selectableCharacters: [CharacterType]
+    let onChangeCharacter: (CharacterType) -> Void
 
-        VStack(alignment: .leading, spacing: 12) {
-            content()
-        }
+    var body: some View {
+        Section(L10n.characterSection) {
+            CharacterPreviewImageView(kind: selectedKind, character: selectedCharacter)
 
-        if let footer {
-            Text(footer)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            Picker(
+                L10n.characterSection,
+                selection: Binding(
+                    get: { selectedCharacter.rawValue },
+                    set: { rawValue in
+                        if let character = CharacterType(rawValue: rawValue) {
+                            onChangeCharacter(character)
+                        }
+                    }
+                )
+            ) {
+                ForEach(selectableCharacters, id: \.rawValue) { character in
+                    Text(character.title).tag(character.rawValue)
+                }
+            }
         }
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(12)
-    .background(Color(.system))
-    .clipShape(.rect(cornerRadius: 8))
+}
+
+private struct HabitNameSection: View {
+    let nameInput: String
+    let onChangeName: (String) -> Void
+
+    var body: some View {
+        Section(L10n.nameSection) {
+            TextField(
+                L10n.namePlaceholder,
+                text: Binding(get: { nameInput }, set: onChangeName)
+            )
+        }
+    }
+}
+
+private struct HabitGoalSection: View {
+    let selectedKind: HabitKind
+    let goalDeadline: Date
+    let goalPerDayInput: String
+    let onChangeGoalDeadline: (Date) -> Void
+    let onChangeGoalPerDay: (String) -> Void
+
+    var body: some View {
+        Section(L10n.goalSection) {
+            DatePicker(
+                L10n.goalDeadlineTitle,
+                selection: Binding(get: { goalDeadline }, set: onChangeGoalDeadline),
+                displayedComponents: [.date]
+            )
+            .environment(\.locale, .current)
+
+            LabeledContent("\(L10n.goalPerDayTitle)（\(selectedKind.unitTitle)）") {
+                TextField(
+                    "0",
+                    text: Binding(get: { goalPerDayInput }, set: onChangeGoalPerDay)
+                )
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.trailing)
+                .frame(minWidth: 44)
+            }
+        }
+    }
+}
+
+private struct HabitYesterdaySection: View {
+    let selectedKind: HabitKind
+    let yesterdayCountInput: String
+    let onChangeYesterdayCount: (String) -> Void
+
+    var body: some View {
+        Section {
+            LabeledContent("\(L10n.yesterdayCountTitle)（\(selectedKind.unitTitle)）") {
+                TextField(
+                    L10n.yesterdaySimplePlaceholder,
+                    text: Binding(get: { yesterdayCountInput }, set: onChangeYesterdayCount)
+                )
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.trailing)
+                .frame(minWidth: 44)
+            }
+        } header: {
+            Text(L10n.yesterdaySection)
+        } footer: {
+            Text(L10n.yesterdayFooter)
+        }
+    }
+}
+
+private struct CharacterPreviewImageView: View {
+    let kind: HabitKind
+    let character: CharacterType
+
+    var body: some View {
+        let names = habitCharacterAssetNames(kind: kind, character: character, level: 1)
+        Group {
+            if let image = AppCharacterImageLoader.load(named: names) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                Image(systemName: "pawprint.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 96)
+    }
+}
+
+private enum AppCharacterImageLoader {
+    static func load(named names: [String]) -> UIImage? {
+        for name in names {
+            if let image = UIImage(named: name, in: .main, compatibleWith: nil) {
+                return image
+            }
+        }
+        return nil
+    }
 }
 
 private enum L10n {

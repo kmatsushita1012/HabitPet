@@ -28,3 +28,8 @@ Recent history uses short, imperative commit subjects such as `Implement #2` and
 
 ## Agent-Specific Instructions
 Inspect before editing, make the smallest safe change, and avoid destructive git operations. Run git commands from the repo root only; do not use `git -C`.
+
+### Additional Team Rules (Must Follow)
+- ユーザーが意図的に加えた変更を、明示的な許可なく戻さないこと。
+- 単体の `@ViewBuilder` 関数を作らないこと。
+- 再利用が必要なUIは `struct` として切り出して実装すること。
