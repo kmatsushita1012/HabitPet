@@ -32,7 +32,7 @@ struct HabitPetWidget: Widget {
         }
         .configurationDisplayName("HabitPet カウンター")
         .description("今日のカウントをホーム画面から記録できます。")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall])
     }
 }
 
@@ -50,6 +50,15 @@ private struct HabitPetWidgetView: View {
         HabitEvent.all
     )
     private var activeEvents
+    
+    @FetchOne
+    private var currentCount: Int = 0
+    
+    init(entry: HabitCounterEntry) {
+        if let currentHabit {
+            _currentCount = FetchOne(wrappedValue: 0, HabitEvent.where{ $0.habitID.eq(currentHabit.id).and($0.revokedAt.is(nil)) }.select{ $0.delta.total() })
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -68,6 +77,7 @@ private struct HabitPetWidgetView: View {
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
+                    .foregroundStyle(WidgetTheme.primaryText)
                 Spacer(minLength: 4)
                 if let habitID = currentHabit?.id.uuidString {
                     Button(intent: CountUpIntent(habitID: habitID)) {
@@ -75,12 +85,17 @@ private struct HabitPetWidgetView: View {
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderedProminent)
+                    .tint(.green)
                 }
             }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(WidgetTheme.panelFill)
+            .clipShape(.rect(cornerRadius: 8))
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .containerBackground(.fill.tertiary, for: .widget)
+        .containerBackground(WidgetTheme.background, for: .widget)
     }
 
     private var characterImage: Image {
@@ -98,19 +113,49 @@ private struct HabitPetWidgetView: View {
     private var currentHabit: Habit? {
         habits.first
     }
-
-    private var currentCount: Int {
-        guard let habitID = currentHabit?.id else { return 0 }
-        return activeEvents
-            .filter { $0.habitID == habitID && $0.revokedAt == nil }
-            .reduce(into: 0) { partialResult, event in
-                partialResult += event.delta
-            }
-    }
     
     private var stateLevel: Int {
         habitStateLevel(forTotalCount: currentCount)
     }
+}
+
+private enum WidgetTheme {
+    static let background = LinearGradient(
+        colors: [
+            Color(
+                uiColor: UIColor { traits in
+                    traits.userInterfaceStyle == .dark
+                        ? UIColor(red: 0.16, green: 0.13, blue: 0.10, alpha: 1.0)
+                        : UIColor(red: 0.94, green: 0.90, blue: 0.84, alpha: 1.0)
+                }
+            ),
+            Color(
+                uiColor: UIColor { traits in
+                    traits.userInterfaceStyle == .dark
+                        ? UIColor(red: 0.10, green: 0.08, blue: 0.06, alpha: 1.0)
+                        : UIColor(red: 0.88, green: 0.80, blue: 0.70, alpha: 1.0)
+                }
+            ),
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    static let panelFill = Color(
+        uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.33, green: 0.25, blue: 0.18, alpha: 0.46)
+                : UIColor(red: 0.36, green: 0.27, blue: 0.18, alpha: 0.16)
+        }
+    )
+
+    static let primaryText = Color(
+        uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.96, green: 0.94, blue: 0.90, alpha: 1.0)
+                : UIColor.label
+        }
+    )
 }
 
 private enum WidgetCharacterImageLoader {

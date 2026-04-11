@@ -10,33 +10,37 @@ struct MainPagerView: View {
         @Bindable var viewModel = viewModel
 
         NavigationStack {
-            Group {
-                if viewModel.habits.isEmpty {
-                    ContentUnavailableView(
-                        "習慣がまだありません",
-                        systemImage: "pawprint",
-                        description: Text("右上の + から最初の習慣を作成してください。")
-                    )
-                } else {
-                    TabView(selection: $viewModel.selectedPageIndex) {
-                        ForEach(Array(viewModel.habits.enumerated()), id: \.element.id) { index, habit in
-                            HabitPageCard(
-                                habit: habit,
-                                totalCount: viewModel.totalCount(for: habit.id),
-                                todayCount: viewModel.todayCount(for: habit.id),
-                                goalTimelineStatus: viewModel.goalTimelineStatus(for: habit),
-                                recentDailySeries: viewModel.recentDailyCounts(for: habit.id, days: 14),
-                                onTapCountUp: { viewModel.onTapCountUp() },
-                                onTapUndo: { viewModel.onTapUndoCount() }
-                            )
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .tag(index)
+            ZStack {
+                MainPagerTheme.pageBackground.ignoresSafeArea()
+
+                Group {
+                    if viewModel.habits.isEmpty {
+                        ContentUnavailableView(
+                            "習慣がまだありません",
+                            systemImage: "pawprint",
+                            description: Text("右上の + から最初の習慣を作成してください。")
+                        )
+                    } else {
+                        TabView(selection: $viewModel.selectedPageIndex) {
+                            ForEach(Array(viewModel.habits.enumerated()), id: \.element.id) { index, habit in
+                                HabitPageCard(
+                                    habit: habit,
+                                    totalCount: viewModel.totalCount(for: habit.id),
+                                    todayCount: viewModel.todayCount(for: habit.id),
+                                    goalTimelineStatus: viewModel.goalTimelineStatus(for: habit),
+                                    recentDailySeries: viewModel.recentDailyCounts(for: habit.id, days: 14),
+                                    onTapCountUp: { viewModel.onTapCountUp() },
+                                    onTapUndo: { viewModel.onTapUndoCount() }
+                                )
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .tag(index)
+                            }
                         }
-                    }
-                    .tabViewStyle(.page(indexDisplayMode: .always))
-                    .onChange(of: viewModel.selectedPageIndex) { _, newValue in
-                        viewModel.onPageChanged(newValue)
+                        .tabViewStyle(.page(indexDisplayMode: .always))
+                        .onChange(of: viewModel.selectedPageIndex) { _, newValue in
+                            viewModel.onPageChanged(newValue)
+                        }
                     }
                 }
             }
@@ -196,7 +200,11 @@ private struct HabitOverallStatusCard: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(10)
-        .background(.ultraThinMaterial)
+        .background(MainPagerTheme.cardFill)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(MainPagerTheme.cardStroke, lineWidth: 1)
+        )
         .clipShape(.rect(cornerRadius: 8))
     }
 }
@@ -253,7 +261,11 @@ private struct HabitTodayStatusCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(.ultraThinMaterial)
+        .background(MainPagerTheme.cardFill)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(MainPagerTheme.cardStroke, lineWidth: 1)
+        )
         .clipShape(.rect(cornerRadius: 8))
     }
 }
@@ -274,7 +286,7 @@ private struct HabitHistoryChartCard: View {
                     x: .value("日付", point.date, unit: .day),
                     y: .value("記録", point.count)
                 )
-                .foregroundStyle(.teal)
+                .foregroundStyle(.green)
             }
             .chartYScale(domain: 0...maxCount)
             .frame(maxWidth: .infinity)
@@ -288,7 +300,11 @@ private struct HabitHistoryChartCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(.ultraThinMaterial)
+        .background(MainPagerTheme.cardFill)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(MainPagerTheme.cardStroke, lineWidth: 1)
+        )
         .clipShape(.rect(cornerRadius: 8))
     }
 }
@@ -317,7 +333,11 @@ private struct HabitCharacterImageView: View {
         }
         .frame(maxWidth: .infinity)
         .aspectRatio(4.0 / 3.0, contentMode: .fit)
-        .background(.ultraThinMaterial)
+        .background(MainPagerTheme.cardFill)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(MainPagerTheme.cardStroke, lineWidth: 1)
+        )
         .clipShape(.rect(cornerRadius: 8))
     }
 }
@@ -331,6 +351,44 @@ private enum AppCharacterImageLoader {
         }
         return nil
     }
+}
+
+private enum MainPagerTheme {
+    static let pageBackground = LinearGradient(
+        colors: [
+            Color(
+                uiColor: UIColor { traits in
+                    traits.userInterfaceStyle == .dark
+                        ? UIColor(red: 0.16, green: 0.13, blue: 0.10, alpha: 1.0)
+                        : UIColor(red: 0.94, green: 0.90, blue: 0.84, alpha: 1.0)
+                }
+            ),
+            Color(
+                uiColor: UIColor { traits in
+                    traits.userInterfaceStyle == .dark
+                        ? UIColor(red: 0.10, green: 0.08, blue: 0.06, alpha: 1.0)
+                        : UIColor(red: 0.88, green: 0.80, blue: 0.70, alpha: 1.0)
+                }
+            ),
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    static let cardFill = Color(
+        uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.33, green: 0.25, blue: 0.18, alpha: 0.46)
+                : UIColor(red: 0.36, green: 0.27, blue: 0.18, alpha: 0.16)
+        }
+    )
+    static let cardStroke = Color(
+        uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.66, green: 0.53, blue: 0.40, alpha: 0.42)
+                : UIColor(red: 0.30, green: 0.23, blue: 0.16, alpha: 0.34)
+        }
+    )
 }
 
 #Preview {

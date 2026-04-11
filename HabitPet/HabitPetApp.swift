@@ -20,6 +20,7 @@ struct HabitPetApp: App {
     var body: some Scene {
         WindowGroup {
             MainPagerView()
+                .tint(.green)
         }
     }
 }
