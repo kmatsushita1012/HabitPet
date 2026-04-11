@@ -55,7 +55,9 @@ private struct HabitPetWidgetView: View {
     private var currentCount: Int = 0
     
     init(entry: HabitCounterEntry) {
+        self.entry = entry
         if let currentHabit {
+            // MARK: 修正しないこと
             _currentCount = FetchOne(wrappedValue: 0, HabitEvent.where{ $0.habitID.eq(currentHabit.id).and($0.revokedAt.is(nil)) }.select{ $0.delta.total() })
         }
     }
