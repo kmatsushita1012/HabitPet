@@ -26,10 +26,6 @@ nonisolated private func makeDatabaseMigrator() -> DatabaseMigrator {
         try createTables(in: db)
     }
 
-    migrator.registerMigration("Create HabitPet tables") { db in
-        try createTables(in: db)
-    }
-
     return migrator
 }
 
@@ -38,15 +34,11 @@ nonisolated private func createTables(in db: Database) throws {
         """
         CREATE TABLE IF NOT EXISTS "habits" (
           "id" TEXT NOT NULL PRIMARY KEY,
-          "name" TEXT NOT NULL,
-          "mode" TEXT NOT NULL,
-          "characterID" TEXT NOT NULL,
-          "countUnit" TEXT NOT NULL,
-          "baselineSource" TEXT NOT NULL,
-          "baselineManualValue" REAL,
-          "goalType" TEXT NOT NULL,
-          "goalValue" INTEGER,
-          "goalDate" TEXT,
+          "kind" TEXT NOT NULL,
+          "character" TEXT NOT NULL,
+          "name" TEXT,
+          "goalDeadline" TEXT NOT NULL,
+          "goalPerDay" INTEGER NOT NULL,
           "isArchived" INTEGER NOT NULL,
           "sortOrder" INTEGER NOT NULL,
           "createdAt" TEXT NOT NULL,

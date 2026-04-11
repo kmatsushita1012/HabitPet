@@ -50,21 +50,6 @@ private struct HabitPetWidgetView: View {
         HabitEvent.all
     )
     private var activeEvents
-    
-    @FetchOne private var currentCount: Int = 0
-    
-    init(entry: HabitCounterEntry) {
-        self.entry = entry
-        if let habitId = habits.first?.id {
-            _currentCount = FetchOne(
-                wrappedValue: 0,
-                HabitEvent
-                    .where{
-                        $0.habitID.eq(habitId)
-                            .and($0.revokedAt.is(nil))
-                    }.select{ $0.delta.total() })
-        }
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -78,7 +63,7 @@ private struct HabitPetWidgetView: View {
             Spacer(minLength: 0)
 
             HStack(spacing: 6) {
-                Text("\(currentCount)本")
+                Text("\(currentCount)\(currentHabit?.kind.unitTitle ?? "回")")
                     .font(.callout.bold())
                     .monospacedDigit()
                     .lineLimit(1)
@@ -99,11 +84,11 @@ private struct HabitPetWidgetView: View {
     }
 
     private var characterImage: Image {
-        guard let characterID = currentHabit?.characterID else {
+        guard let habit = currentHabit else {
             return Image(systemName: "pawprint.fill")
         }
-        let name = "character_\(characterID)_lv\(stateLevel)"
-        if let uiImage = WidgetCharacterImageLoader.load(named: name) {
+        let names = habitCharacterAssetNames(kind: habit.kind, character: habit.character, level: stateLevel)
+        if let uiImage = WidgetCharacterImageLoader.load(named: names) {
             return Image(uiImage: uiImage)
         } else {
             return Image(systemName: "pawprint.fill")
@@ -113,6 +98,15 @@ private struct HabitPetWidgetView: View {
     private var currentHabit: Habit? {
         habits.first
     }
+
+    private var currentCount: Int {
+        guard let habitID = currentHabit?.id else { return 0 }
+        return activeEvents
+            .filter { $0.habitID == habitID && $0.revokedAt == nil }
+            .reduce(into: 0) { partialResult, event in
+                partialResult += event.delta
+            }
+    }
     
     private var stateLevel: Int {
         habitStateLevel(forTotalCount: currentCount)
@@ -120,17 +114,22 @@ private struct HabitPetWidgetView: View {
 }
 
 private enum WidgetCharacterImageLoader {
-    static func load(named name: String) -> UIImage? {
-        if let image = UIImage(named: name, in: .main, compatibleWith: nil) {
-            return image
+    static func load(named names: [String]) -> UIImage? {
+        for name in names {
+            if let image = UIImage(named: name, in: .main, compatibleWith: nil) {
+                return image
+            }
         }
 
         let appBundleURL = Bundle.main.bundleURL
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        if let appBundle = Bundle(url: appBundleURL),
-           let image = UIImage(named: name, in: appBundle, compatibleWith: nil) {
-            return image
+        if let appBundle = Bundle(url: appBundleURL) {
+            for name in names {
+                if let image = UIImage(named: name, in: appBundle, compatibleWith: nil) {
+                    return image
+                }
+            }
         }
         return nil
     }

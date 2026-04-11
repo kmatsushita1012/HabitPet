@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct MainPagerView: View {
     @State private var viewModel = MainPagerViewModel()
@@ -20,17 +21,15 @@ struct MainPagerView: View {
                         ForEach(Array(viewModel.habits.enumerated()), id: \.element.id) { index, habit in
                             let totalCount = viewModel.totalCount(for: habit.id)
                             VStack(spacing: 12) {
-                                Image("character_\(habit.characterID)_lv\(habitStateLevel(forTotalCount: totalCount))")
-                                    .resizable()
-                                    .scaledToFit()
+                                characterImage(for: habit, totalCount: totalCount)
                                     .frame(width: 120, height: 120)
 
-                                Text(habit.name)
+                                Text(habit.name ?? habit.kind.title)
                                     .font(.title2.bold())
-                                Text("キャラクター: \(habit.characterID)")
+                                Text("種類: \(habit.kind.title) / キャラクター: \(habit.character.title)")
                                     .foregroundStyle(.secondary)
 
-                                Text("クイック記録（総和）: \(totalCount)")
+                                Text("クイック記録（総和）: \(totalCount)\(habit.kind.unitTitle)")
                                     .font(.headline)
                                     .monospacedDigit()
 
@@ -110,6 +109,34 @@ struct MainPagerView: View {
                 ContentUnavailableView("編集対象が見つかりません", systemImage: "exclamationmark.circle")
             }
         }
+    }
+}
+
+private func characterImage(for habit: Habit, totalCount: Int) -> some View {
+    let level = habitStateLevel(forTotalCount: totalCount)
+    let names = habitCharacterAssetNames(kind: habit.kind, character: habit.character, level: level)
+
+    return Group {
+        if let image = AppCharacterImageLoader.load(named: names) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+        } else {
+            Image(systemName: "pawprint.fill")
+                .resizable()
+                .scaledToFit()
+        }
+    }
+}
+
+private enum AppCharacterImageLoader {
+    static func load(named names: [String]) -> UIImage? {
+        for name in names {
+            if let image = UIImage(named: name, in: .main, compatibleWith: nil) {
+                return image
+            }
+        }
+        return nil
     }
 }
 

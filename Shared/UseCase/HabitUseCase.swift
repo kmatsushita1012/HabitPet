@@ -2,49 +2,55 @@ import Dependencies
 import Foundation
 
 struct HabitDraft: Sendable {
-    var name: String
-    var mode: HabitMode
-    var characterID: String
-    var countUnit: HabitCountUnit
-    var baselineSource: HabitBaselineSource
-    var baselineManualValue: Double?
-    var goalType: HabitGoalType
-    var goalValue: Int?
-    var goalDate: String?
+    var kind: HabitKind
+    var character: CharacterType
+    var name: String?
+    var goalDeadline: String
+    var goalPerDay: Int
     var sortOrder: Int
 }
 
 protocol HabitUseCaseProtocol: Sendable {
-    func createHabit(_ draft: HabitDraft, now: Date) throws -> Habit
+    func createHabit(_ draft: HabitDraft, yesterdayCount: Int, now: Date) throws -> Habit
     func updateHabit(_ habit: Habit, now: Date) throws
     func archiveHabit(_ habit: Habit, now: Date) throws
     func recordDelta(habitID: Habit.ID, delta: Int, source: HabitEventSource, now: Date) throws
     func undoDelta(habitID: Habit.ID, count: Int, now: Date) throws
-    func resolveStateLevel(todayUsage: Int, baseline: Double) -> Int
 }
 
 struct HabitUseCase: HabitUseCaseProtocol, Sendable {
     @Dependency(\.habitDataStore) private var habitDataStore
     @Dependency(\.habitEventDataStore) private var habitEventDataStore
 
-    func createHabit(_ draft: HabitDraft, now: Date = Date()) throws -> Habit {
+    func createHabit(_ draft: HabitDraft, yesterdayCount: Int = 0, now: Date = Date()) throws -> Habit {
         let habit = Habit(
             id: Habit.ID(),
+            kind: draft.kind,
+            character: draft.character,
             name: draft.name,
-            mode: draft.mode,
-            characterID: draft.characterID,
-            countUnit: draft.countUnit,
-            baselineSource: draft.baselineSource,
-            baselineManualValue: draft.baselineManualValue,
-            goalType: draft.goalType,
-            goalValue: draft.goalValue,
-            goalDate: draft.goalDate,
+            goalDeadline: draft.goalDeadline,
+            goalPerDay: max(0, draft.goalPerDay),
             isArchived: false,
             sortOrder: draft.sortOrder,
             createdAt: now,
             updatedAt: now
         )
         try habitDataStore.create(habit)
+
+        if yesterdayCount > 0 {
+            let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now
+            let setupEvent = HabitEvent(
+                id: HabitEvent.ID(),
+                habitID: habit.id,
+                delta: yesterdayCount,
+                source: .setup,
+                occurredAt: yesterday,
+                revokedAt: nil,
+                createdAt: now
+            )
+            try habitEventDataStore.create(setupEvent)
+        }
+
         return habit
     }
 
@@ -78,22 +84,6 @@ struct HabitUseCase: HabitUseCaseProtocol, Sendable {
         try habitEventDataStore.revokeLast(habitID: habitID, count: count, now: now)
     }
 
-    func resolveStateLevel(todayUsage: Int, baseline: Double) -> Int {
-        guard baseline > 0 else { return 1 }
-        let ratio = Double(todayUsage) / baseline
-        switch ratio {
-        case ..<0.25:
-            return 1
-        case ..<0.5:
-            return 2
-        case ..<0.75:
-            return 3
-        case ..<1.0:
-            return 4
-        default:
-            return 5
-        }
-    }
 }
 
 private enum HabitUseCaseKey: DependencyKey {

@@ -1,31 +1,66 @@
 import Foundation
 import SQLiteData
 
-enum HabitMode: String, CaseIterable, Sendable, Codable, QueryBindable {
-    case avoid
-    case doMore
+enum HabitKind: String, CaseIterable, Sendable, Codable, QueryBindable {
+    case nonSmoking
+    case nonAlcohol
+    case nonGambling
+    case other
+
+    var title: String {
+        switch self {
+        case .nonSmoking: "禁煙"
+        case .nonAlcohol: "禁酒"
+        case .nonGambling: "脱ギャンブル"
+        case .other: "その他"
+        }
+    }
+
+    var unitTitle: String {
+        switch self {
+        case .nonSmoking: "本"
+        case .nonAlcohol: "杯"
+        case .nonGambling: "回"
+        case .other: "回"
+        }
+    }
 }
 
-enum HabitCountUnit: String, CaseIterable, Sendable, Codable, QueryBindable {
-    case count
-    case minute
-    case hour
+enum CharacterType: String, CaseIterable, Sendable, Codable, QueryBindable {
+    case hamster
+    case fox
+    case cat
+    case rabbit
+
+    var title: String {
+        switch self {
+        case .hamster: "ハムスター"
+        case .fox: "キツネ"
+        case .cat: "ネコ"
+        case .rabbit: "ウサギ"
+        }
+    }
 }
 
-enum HabitBaselineSource: String, CaseIterable, Sendable, Codable, QueryBindable {
-    case manual
-    case rolling7
-}
-
-enum HabitGoalType: String, CaseIterable, Sendable, Codable, QueryBindable {
-    case none
-    case count
-    case date
+extension CharacterType {
+    static func candidates(for kind: HabitKind) -> [CharacterType] {
+        switch kind {
+        case .nonSmoking:
+            return [.hamster, .fox]
+        case .nonAlcohol:
+            return [.cat, .rabbit]
+        case .nonGambling:
+            return [.fox, .cat]
+        case .other:
+            return Self.allCases
+        }
+    }
 }
 
 enum HabitEventSource: String, CaseIterable, Sendable, Codable, QueryBindable {
     case app
     case widget
+    case setup
 }
 
 @Table
@@ -33,18 +68,13 @@ struct Habit: Sendable, Identifiable {
     typealias ID = UUID
 
     var id: Habit.ID
-    var name: String
-    var mode: HabitMode
-    var characterID: String
-    var countUnit: HabitCountUnit
-    var baselineSource: HabitBaselineSource
-    var baselineManualValue: Double?
-    var goalType: HabitGoalType
-    var goalValue: Int?
-    var goalDate: String?
+    var kind: HabitKind
+    var character: CharacterType
+    var name: String?
+    var goalDeadline: String
+    var goalPerDay: Int
     var isArchived: Bool
     var sortOrder: Int
-    
     var createdAt: Date
     var updatedAt: Date
 }
@@ -62,48 +92,6 @@ struct HabitEvent: Sendable, Identifiable {
     var createdAt: Date
 }
 
-@Selection
-struct HabitRecentEventSelection: Sendable, Identifiable {
-    var event: HabitEvent
-
-    var id: HabitEvent.ID { event.id }
-}
-
-@Selection
-struct HabitTodayUsageSelection: Sendable, Identifiable {
-    var habitID: Habit.ID
-    var todayUsage: Int
-
-    var id: Habit.ID { habitID }
-}
-
-@Selection
-struct HabitBaselineSelection: Sendable, Identifiable {
-    var habitID: Habit.ID
-    var baseline: Double
-
-    var id: Habit.ID { habitID }
-}
-
-@Selection
-struct HabitStateSelection: Sendable, Identifiable {
-    var habitID: Habit.ID
-    var stateLevel: Int
-    var baseline: Double
-    var todayUsage: Int
-
-    var id: Habit.ID { habitID }
-}
-
-@Selection
-struct HabitCardSelection: Sendable, Identifiable {
-    var habit: Habit
-    var todayUsage: Int
-    var stateLevel: Int
-
-    var id: Habit.ID { habit.id }
-}
-
 func habitStateLevel(forTotalCount totalCount: Int) -> Int {
     switch totalCount {
     case ..<5:
@@ -117,4 +105,12 @@ func habitStateLevel(forTotalCount totalCount: Int) -> Int {
     default:
         return 5
     }
+}
+
+func habitCharacterAssetNames(kind: HabitKind, character: CharacterType, level: Int) -> [String] {
+    let clampedLevel = min(max(level, 1), 5)
+    return [
+        "character_\(kind.rawValue)_\(character.rawValue)_lv\(clampedLevel)",
+        "character_\(character.rawValue)_lv\(clampedLevel)",
+    ]
 }

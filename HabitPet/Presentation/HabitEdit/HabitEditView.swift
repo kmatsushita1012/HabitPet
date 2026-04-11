@@ -9,80 +9,66 @@ struct HabitEditView: View {
 
         NavigationStack {
             Form {
-                Section(L10n.basicSection) {
+                Section(L10n.kindSection) {
+                    Picker(
+                        L10n.kindTitle,
+                        selection: Binding(
+                            get: { viewModel.selectedKind },
+                            set: { viewModel.onChangeKind($0) }
+                        )
+                    ) {
+                        ForEach(HabitKind.allCases, id: \.self) { kind in
+                            Text(kind.title).tag(kind)
+                        }
+                    }
+                }
+
+                Section(L10n.characterSection) {
+                    Picker(
+                        L10n.characterTitle,
+                        selection: Binding(
+                            get: { viewModel.selectedCharacter },
+                            set: { viewModel.onChangeCharacter($0) }
+                        )
+                    ) {
+                        ForEach(viewModel.selectableCharacters, id: \.self) { character in
+                            Text(character.title).tag(character)
+                        }
+                    }
+                }
+
+                Section(L10n.nameSection) {
                     TextField(
-                        L10n.habitNamePlaceholder,
+                        L10n.namePlaceholder,
                         text: Binding(
                             get: { viewModel.nameInput },
                             set: { viewModel.onChangeName($0) }
                         )
                     )
-
-                    Picker(
-                        L10n.modeTitle,
-                        selection: Binding(
-                            get: { viewModel.selectedMode },
-                            set: { viewModel.onChangeMode($0) }
-                        )
-                    ) {
-                        Text(L10n.modeAvoid).tag(HabitMode.avoid)
-                        Text(L10n.modeDoMore).tag(HabitMode.doMore)
-                    }
-
-                    TextField(
-                        L10n.characterIDTitle,
-                        text: Binding(
-                            get: { viewModel.selectedCharacterID },
-                            set: { viewModel.onChangeCharacter($0) }
-                        )
-                    )
                 }
 
                 Section(L10n.goalSection) {
+                    DatePicker(
+                        L10n.goalDeadlineTitle,
+                        selection: Binding(
+                            get: { viewModel.goalDeadline },
+                            set: { viewModel.onChangeGoalDeadline($0) }
+                        ),
+                        displayedComponents: [.date]
+                    )
+
                     TextField(
-                        L10n.baselinePlaceholder,
+                        "\(L10n.goalPerDayTitle)（\(viewModel.selectedKind.unitTitle)）",
                         text: Binding(
-                            get: { viewModel.baselineInput },
-                            set: { viewModel.onChangeBaseline($0) }
+                            get: { viewModel.goalPerDayInput },
+                            set: { viewModel.onChangeGoalPerDay($0) }
                         )
                     )
-                    .keyboardType(.decimalPad)
+                    .keyboardType(.numberPad)
+                }
 
-                    Picker(
-                        L10n.goalTypeTitle,
-                        selection: Binding(
-                            get: { viewModel.goalType },
-                            set: { viewModel.onChangeGoalType($0) }
-                        )
-                    ) {
-                        Text(L10n.goalTypeNone).tag(HabitGoalType.none)
-                        Text(L10n.goalTypeCount).tag(HabitGoalType.count)
-                        Text(L10n.goalTypeDate).tag(HabitGoalType.date)
-                    }
-
-                    switch viewModel.goalType {
-                    case .none:
-                        Text(L10n.goalTypeNoneDescription)
-                            .foregroundStyle(.secondary)
-                    case .count:
-                        TextField(
-                            L10n.goalValuePlaceholder,
-                            text: Binding(
-                                get: { viewModel.goalValueInput },
-                                set: { viewModel.onChangeGoalValue($0) }
-                            )
-                        )
-                        .keyboardType(.numberPad)
-                    case .date:
-                        DatePicker(
-                            L10n.goalDateTitle,
-                            selection: Binding(
-                                get: { viewModel.goalDate ?? Date() },
-                                set: { viewModel.onChangeGoalDate($0) }
-                            ),
-                            displayedComponents: [.date]
-                        )
-                    }
+                if viewModel.editingHabit == nil {
+                    yesterdayCountSection(viewModel: viewModel)
                 }
 
                 if viewModel.editingHabit != nil {
@@ -110,7 +96,6 @@ struct HabitEditView: View {
                         Image(systemName: "checkmark")
                     }
                     .accessibilityLabel(L10n.saveButton)
-                    .disabled(viewModel.nameInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
             .alert(L10n.archiveAlertTitle, isPresented: $viewModel.isArchiveAlertPresented) {
@@ -140,22 +125,39 @@ struct HabitEditView: View {
     }
 }
 
+@ViewBuilder
+private func yesterdayCountSection(viewModel: HabitEditViewModel) -> some View {
+    let title = "\(L10n.yesterdayCountTitle)（\(viewModel.selectedKind.unitTitle)）"
+
+    Section {
+        TextField(
+            title,
+            text: Binding(
+                get: { viewModel.yesterdayCountInput },
+                set: { viewModel.onChangeYesterdayCount($0) }
+            )
+        )
+        .keyboardType(.numberPad)
+    } header: {
+        Text(L10n.yesterdaySection)
+    } footer: {
+        Text(L10n.yesterdayFooter)
+    }
+}
+
 private enum L10n {
-    static let basicSection = String(localized: "habit_edit.section.basic", defaultValue: "基本情報")
-    static let habitNamePlaceholder = String(localized: "habit_edit.field.name", defaultValue: "習慣名")
-    static let modeTitle = String(localized: "habit_edit.field.mode", defaultValue: "モード")
-    static let modeAvoid = String(localized: "habit_edit.mode.avoid", defaultValue: "減らしたい")
-    static let modeDoMore = String(localized: "habit_edit.mode.do_more", defaultValue: "増やしたい")
-    static let characterIDTitle = String(localized: "habit_edit.field.character_id", defaultValue: "キャラクターID")
+    static let kindSection = String(localized: "habit_edit.section.kind", defaultValue: "種類")
+    static let kindTitle = String(localized: "habit_edit.field.kind", defaultValue: "種類")
+    static let characterSection = String(localized: "habit_edit.section.character", defaultValue: "キャラクター")
+    static let characterTitle = String(localized: "habit_edit.field.character", defaultValue: "キャラクター")
+    static let nameSection = String(localized: "habit_edit.section.name", defaultValue: "習慣名（任意）")
+    static let namePlaceholder = String(localized: "habit_edit.field.name", defaultValue: "例: 夜の1本をやめる")
     static let goalSection = String(localized: "habit_edit.section.goal", defaultValue: "目標")
-    static let baselinePlaceholder = String(localized: "habit_edit.field.baseline", defaultValue: "基準値（任意）")
-    static let goalTypeTitle = String(localized: "habit_edit.field.goal_type", defaultValue: "目標タイプ")
-    static let goalTypeNone = String(localized: "habit_edit.goal_type.none", defaultValue: "なし")
-    static let goalTypeCount = String(localized: "habit_edit.goal_type.count", defaultValue: "回数")
-    static let goalTypeDate = String(localized: "habit_edit.goal_type.date", defaultValue: "日付")
-    static let goalTypeNoneDescription = String(localized: "habit_edit.goal_type.none.description", defaultValue: "目標は設定しません。")
-    static let goalValuePlaceholder = String(localized: "habit_edit.field.goal_value", defaultValue: "目標回数")
-    static let goalDateTitle = String(localized: "habit_edit.field.goal_date", defaultValue: "目標日")
+    static let goalDeadlineTitle = String(localized: "habit_edit.field.goal_deadline", defaultValue: "何日まで")
+    static let goalPerDayTitle = String(localized: "habit_edit.field.goal_per_day", defaultValue: "1日あたり上限")
+    static let yesterdaySection = String(localized: "habit_edit.section.yesterday", defaultValue: "昨日の記録（作成時のみ）")
+    static let yesterdayCountTitle = String(localized: "habit_edit.field.yesterday_count", defaultValue: "昨日の記録")
+    static let yesterdayFooter = String(localized: "habit_edit.field.yesterday_footer", defaultValue: "保存時に「昨日」のイベントとして登録されます。")
     static let archiveButton = String(localized: "habit_edit.button.archive", defaultValue: "アーカイブ")
     static let newHabitTitle = String(localized: "habit_edit.title.new", defaultValue: "習慣を追加")
     static let editHabitTitle = String(localized: "habit_edit.title.edit", defaultValue: "習慣を編集")

@@ -8,13 +8,12 @@ import WidgetKit
 final class HabitEditViewModel {
     // UI State
     var editingHabit: Habit?
+    var selectedKind: HabitKind
+    var selectedCharacter: CharacterType
     var nameInput: String
-    var selectedMode: HabitMode
-    var selectedCharacterID: String
-    var baselineInput: String
-    var goalType: HabitGoalType
-    var goalValueInput: String
-    var goalDate: Date?
+    var goalDeadline: Date
+    var goalPerDayInput: String
+    var yesterdayCountInput: String
     var isArchiveAlertPresented = false
     var errorMessage: String?
     var shouldDismiss = false
@@ -31,114 +30,99 @@ final class HabitEditViewModel {
         return formatter
     }()
 
+    @ObservationIgnored
+    private let calendar = Calendar(identifier: .gregorian)
+
     init(habit: Habit?) {
+        let initialKind = habit?.kind ?? .nonSmoking
+        let availableCharacters = CharacterType.candidates(for: initialKind)
+        let initialCharacter = habit?.character ?? availableCharacters.first ?? .hamster
+        let resolvedCharacter = availableCharacters.contains(initialCharacter)
+            ? initialCharacter
+            : (availableCharacters.first ?? .hamster)
+        let resolvedGoalDeadline = Self.parseGoalDeadline(
+            habit?.goalDeadline,
+            formatter: dateFormatter
+        ) ?? Self.defaultGoalDeadline(calendar: calendar)
+
         editingHabit = habit
+        selectedKind = initialKind
+        selectedCharacter = resolvedCharacter
         nameInput = habit?.name ?? ""
-        selectedMode = habit?.mode ?? .avoid
-        selectedCharacterID = habit?.characterID ?? "hamster"
-        baselineInput = habit?.baselineManualValue.map { String($0) } ?? ""
-        goalType = habit?.goalType ?? .none
-        goalValueInput = habit?.goalValue.map { String($0) } ?? ""
-        goalDate = habit?.goalDate.flatMap { dateFormatter.date(from: $0) }
+        goalPerDayInput = String(habit?.goalPerDay ?? 0)
+        yesterdayCountInput = ""
+        goalDeadline = resolvedGoalDeadline
     }
 
     // Action methods
     func onAppearForCreate() {
         guard editingHabit == nil else { return }
+        selectedKind = .nonSmoking
+        selectedCharacter = CharacterType.candidates(for: .nonSmoking).first ?? .hamster
         nameInput = ""
-        selectedMode = .avoid
-        selectedCharacterID = "hamster"
-        baselineInput = ""
-        goalType = .none
-        goalValueInput = ""
-        goalDate = nil
+        goalDeadline = Self.defaultGoalDeadline(calendar: calendar)
+        goalPerDayInput = "0"
+        yesterdayCountInput = ""
+    }
+
+    func onChangeKind(_ kind: HabitKind) {
+        selectedKind = kind
+        let candidates = CharacterType.candidates(for: kind)
+        if !candidates.contains(selectedCharacter) {
+            selectedCharacter = candidates.first ?? .hamster
+        }
+    }
+
+    func onChangeCharacter(_ character: CharacterType) {
+        selectedCharacter = character
     }
 
     func onChangeName(_ value: String) {
         nameInput = value
     }
 
-    func onChangeMode(_ mode: HabitMode) {
-        selectedMode = mode
+    func onChangeGoalDeadline(_ date: Date) {
+        goalDeadline = date
     }
 
-    func onChangeCharacter(_ characterID: String) {
-        selectedCharacterID = characterID
+    func onChangeGoalPerDay(_ value: String) {
+        goalPerDayInput = value
     }
 
-    func onChangeBaseline(_ value: String) {
-        baselineInput = value
-    }
-
-    func onChangeGoalType(_ type: HabitGoalType) {
-        goalType = type
-        switch type {
-        case .none:
-            goalValueInput = ""
-            goalDate = nil
-        case .count:
-            goalDate = nil
-        case .date:
-            goalValueInput = ""
-            if goalDate == nil {
-                goalDate = Date()
-            }
-        }
-    }
-
-    func onChangeGoalValue(_ value: String) {
-        goalValueInput = value
-    }
-
-    func onChangeGoalDate(_ date: Date?) {
-        goalDate = date
+    func onChangeYesterdayCount(_ value: String) {
+        yesterdayCountInput = value
     }
 
     func onTapSave() {
         Task {
             do {
-                let goalDateString = goalDate.map { dateFormatter.string(from: $0) }
-                let baselineValue = Double(baselineInput)
-                let goalValue = Int(goalValueInput)
-                let normalizedGoalValue: Int?
-                let normalizedGoalDate: String?
-                switch goalType {
-                case .none:
-                    normalizedGoalValue = nil
-                    normalizedGoalDate = nil
-                case .count:
-                    normalizedGoalValue = goalValue
-                    normalizedGoalDate = nil
-                case .date:
-                    normalizedGoalValue = nil
-                    normalizedGoalDate = goalDateString
-                }
+                let goalDeadlineString = dateFormatter.string(from: goalDeadline)
+                let goalPerDay = max(0, Int(goalPerDayInput) ?? 0)
+                let trimmedName = nameInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                let normalizedName = trimmedName.isEmpty ? nil : trimmedName
 
                 if var habit = editingHabit {
-                    habit.name = nameInput
-                    habit.mode = selectedMode
-                    habit.characterID = selectedCharacterID
-                    habit.countUnit = .count
-                    habit.baselineSource = .manual
-                    habit.baselineManualValue = baselineValue
-                    habit.goalType = goalType
-                    habit.goalValue = normalizedGoalValue
-                    habit.goalDate = normalizedGoalDate
+                    habit.kind = selectedKind
+                    habit.character = selectedCharacter
+                    habit.name = normalizedName
+                    habit.goalDeadline = goalDeadlineString
+                    habit.goalPerDay = goalPerDay
                     try habitUseCase.updateHabit(habit, now: Date())
                 } else {
                     let draft = HabitDraft(
-                        name: nameInput,
-                        mode: selectedMode,
-                        characterID: selectedCharacterID,
-                        countUnit: .count,
-                        baselineSource: .manual,
-                        baselineManualValue: baselineValue,
-                        goalType: goalType,
-                        goalValue: normalizedGoalValue,
-                        goalDate: normalizedGoalDate,
+                        kind: selectedKind,
+                        character: selectedCharacter,
+                        name: normalizedName,
+                        goalDeadline: goalDeadlineString,
+                        goalPerDay: goalPerDay,
                         sortOrder: 0
                     )
-                    _ = try habitUseCase.createHabit(draft, now: Date())
+                    let yesterdayCount = max(0, Int(yesterdayCountInput) ?? 0)
+                    _ = try habitUseCase.createHabit(
+                        draft,
+                        yesterdayCount: yesterdayCount,
+                        now: Date()
+                    )
                 }
 
                 WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
@@ -160,5 +144,19 @@ final class HabitEditViewModel {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    // Utilities
+    var selectableCharacters: [CharacterType] {
+        CharacterType.candidates(for: selectedKind)
+    }
+
+    private static func defaultGoalDeadline(calendar: Calendar) -> Date {
+        calendar.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+    }
+
+    private static func parseGoalDeadline(_ raw: String?, formatter: DateFormatter) -> Date? {
+        guard let raw else { return nil }
+        return formatter.date(from: raw)
     }
 }
