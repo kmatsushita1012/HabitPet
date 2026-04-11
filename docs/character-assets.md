@@ -1,49 +1,44 @@
-# Character Asset追加ガイド（MVP）
-
-このガイドは `ios-sqlitedata-app` 準拠の現行実装で、キャラ画像を追加するための手順。
+# Character Asset 設計（kind別）
 
 ## 1. 前提
 
-- 動物種別は `CharacterID`（例: `hamster`, `rabbit`）で表現する。
-- 状態段階は `HabitState.level` の 1..5 で表現する。
-- 画像選択は `CharacterAppearanceResolver` が `CharacterID x Lv` で決める。
+- キャラクターは `CharacterType` enum で管理する。
+- 習慣種別は `HabitKind` enum で管理する。
+- 画像は `kind x character x level(1...5)` で解決する。
 
 ## 2. 命名規約
 
-アセット名は以下で固定:
+アセット名:
 
-`character_<characterID>_lv<level>`
+`character_<kind>_<character>_lv<level>`
 
 例:
-- `character_hamster_lv1`
-- `character_hamster_lv2`
-- `character_hamster_lv3`
-- `character_hamster_lv4`
-- `character_hamster_lv5`
-- `character_rabbit_lv1`
-- `character_rabbit_lv2`
-- `character_rabbit_lv3`
-- `character_rabbit_lv4`
-- `character_rabbit_lv5`
 
-## 3. 画像追加手順
+- `character_nonSmoking_hamster_lv1`
+- `character_nonSmoking_hamster_lv5`
+- `character_nonAlcohol_fox_lv1`
+- `character_nonGambling_cat_lv3`
+- `character_other_dog_lv2`
 
-1. Xcodeで `Assets.xcassets` を開く。
-2. キャラクターごとにフォルダを作成する（例: `character_hamster/`, `character_rabbit/`）。
-3. 上記命名規約で Image Set を作成し、対応するキャラクターフォルダ配下に配置する。
-4. 各 Image Set に 1x/2x/3x を配置する（最低2x/3x推奨）。
-5. `Render As` は `Default` のままにする。
-6. iOSシミュレータで表示を確認する。
+## 3. ディレクトリ推奨構成
 
-## 4. 動作確認ポイント
+`Assets.xcassets` 内に以下を推奨する。
 
-- `HabitPageView` で Lv変化時に画像が切り替わること。
-- 画像未追加の組み合わせはフォールバック絵文字が出ること。
-- `CharacterID` に新種を追加した場合、Lv1..Lv5 すべての命名を守ること。
+- `character_nonSmoking/`
+- `character_nonAlcohol/`
+- `character_nonGambling/`
+- `character_other/`
 
-## 5. 新しい動物を追加する場合
+各フォルダ内に `character_<kind>_<character>_lv1...lv5.imageset` を作成する。
 
-1. `CharacterID` に case を追加する。
-2. `CharacterCatalog.all` にマスタを追加する。
-3. `CharacterAppearanceResolver` のフォールバックを追加する。
-4. `character_<newID>_lv1..5` のアセットを追加する。
+## 4. 実装ルール
+
+- 画像選択は `HabitKind` と `CharacterType` から行う。
+- UIには enum のタイトルを表示し、内部ID文字列を直接編集させない。
+- 画像が欠ける組み合わせはフォールバック画像を表示する。
+
+## 5. 追加時チェック
+
+1. kindごとに `lv1...lv5` が揃っているか
+2. enum定義と表示名が一致しているか
+3. WidgetとAppで同じ命名規約を使っているか

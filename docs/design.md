@@ -1,302 +1,110 @@
-# HabitPet Design (SQLiteData First)
+# HabitPet 設計書（2026-04 改訂）
 
-## 1. 目的
+## 1. 方針
 
-この設計は HabitPet を Point-Free SQLiteData ベースで実装するための唯一の基準とする。
-画面は SwiftUI `View + ViewModel`、バックエンドは `UseCase + DataStore (+ optional Client/Manager)` を採用する。
+- リリース前のため、データ後方互換は考慮しない。
+- 永続化は `SQLiteData` のみを利用する。
+- App / Widget は App Group 共有DBを正本とする。
+- UIは日本語中心で実装し、文言は将来の多言語化を前提にキー管理する。
 
-## 2. 非交渉ルール
+## 2. ドメイン仕様
 
-1. 永続化は SQLiteData + GRDB を使う。
-2. ViewModel は `@MainActor @Observable final class` で定義する。
-3. ViewModel の DB 読み取りは `@FetchAll` / `@FetchOne` を基本とする（`HabitEditViewModel` は initializer 受け取りを許可）。
-4. `@FetchAll` / `@FetchOne` には必ず `@ObservationIgnored` を付ける。
-5. DB 書き込みは DataStore のみが担当する。
-6. DataStore の公開 API は `create` / `update` / `delete` / `upsert(optional)` のみ。
-7. DataStore に fetch API を作らない。
-8. View から ViewModel への入力は Action メソッドのみ。
-9. Action メソッドはすべて `Void` return。
-10. App 起動時に migration で `CREATE TABLE` を実行し、`defaultDatabase` を 1 回だけ準備する。
+### 2.1 習慣（Habit）
 
-## 3. レイヤー構成
+`mode` は廃止し、仕様を「減らす」に統一する。
 
-### 3.1 Presentation
+必須項目:
 
-- View: 表示責務のみ。ビジネスロジックと DB ロジックを持たない。
-- ViewModel: UI State / Entity State / Action / Utility を持つ。
-
-### 3.2 Domain
-
-- UseCase: ユースケース単位の業務ロジックを担当。
-
-### 3.3 Data
-
-- DataStore: 永続エンティティへの書き込み専用。
-- `@Table`: 永続エンティティ。
-- `@Selection`: JOIN / 集計 / 表示用射影。
-
-## 4. ドメインモデル
-
-## 4.1 永続エンティティ（@Table）
-
-- `Habit`
-- `HabitEvent`
-
-### Habit
-
-- `id: UUID` (PK)
-- `name: String`
-- `modeRaw: String`
-- `characterIDRaw: String`
-- `countUnitRaw: String`
-- `baselineSourceRaw: String`
-- `baselineManualValue: Double?`
-- `goalTypeRaw: String`
-- `goalValue: Int?`
-- `goalDate: String?` (`yyyy-MM-dd`)
+- `id: UUID`
+- `kind: HabitKind`  
+  - `nonSmoking`（禁煙）
+  - `nonAlcohol`（禁酒）
+  - `nonGambling`（脱ギャンブル）
+  - `other`（その他）
+- `character: CharacterType`
+- `name: String?`（任意）
+- `goalDeadline: String`（`yyyy-MM-dd`、デフォルトは1週間後）
+- `goalPerDay: Int`（1日あたり本数/杯数、デフォルト `0`）
 - `isArchived: Bool`
 - `sortOrder: Int`
 - `createdAt: Date`
 - `updatedAt: Date`
 
-### HabitEvent
+削除した項目:
 
-- `id: UUID` (PK)
-- `habitID: UUID` (FK -> Habit.id)
-- `delta: Int` (`+1` / `-1`)
-- `sourceRaw: String` (`app` / `widget`)
+- `mode`
+- `countUnit`
+- `baselineSource`
+- `baselineManualValue`
+- `goalType`
+- `goalValue`
+- `goalDate`
+
+### 2.2 イベント（HabitEvent）
+
+既存のイベントは継続利用する。
+
+- `id: UUID`
+- `habitID: UUID`
+- `delta: Int`
+- `source: HabitEventSource` (`app` / `widget`)
 - `occurredAt: Date`
-- `revokedAt: Date?` (Undo pop)
+- `revokedAt: Date?`
 - `createdAt: Date`
 
-## 4.2 読み取りモデル（@Selection）
+## 3. 習慣作成フロー
 
-- `HabitCardSelection`: メインページ表示用（習慣 + 当日値 + 状態レベル）
-- `HabitTodayUsageSelection`: `todayUsage = SUM(delta)`
-- `HabitBaselineSelection`: 直近期間の基準値
-- `HabitStateSelection`: `todayUsage / baseline` から表示状態を算出
-- `HabitRecentEventSelection`: 履歴表示用（`revokedAt == nil` のみ）
+作成時の入力順は以下に固定する。
 
-## 4.3 固定マスタ（非永続）
+1. `kind`（種類）
+2. `character`（キャラクター）
+3. `name`（任意）
 
-- `CharacterMaster` はアプリ内定数で管理する。
-- `character_<id>_lv<1...5>` 命名でアセット解決する。
+同時に目標は以下を入力可能にする。
 
-## 5. DB 初期化・マイグレーション
+- `goalDeadline`（何日まで）
+- `goalPerDay`（1日あたり本数/杯数）
 
-```swift
-import SQLiteData
+初期値:
 
-func appDatabase() throws -> any DatabaseWriter {
-    let database = try defaultDatabase(configuration: Configuration())
+- `goalDeadline` = 今日から7日後
+- `goalPerDay` = `0`
 
-    var migrator = DatabaseMigrator()
-    #if DEBUG
-    migrator.eraseDatabaseOnSchemaChange = true
-    #endif
+また、作成時のみ「昨日の記録」を入力可能にする。  
+保存時に「昨日」の `HabitEvent` として登録する（初回作成時のみ）。
 
-    migrator.registerMigration("Create tables") { db in
-        try #sql("""
-            CREATE TABLE "habit" (
-              "id" TEXT NOT NULL PRIMARY KEY,
-              "name" TEXT NOT NULL,
-              "modeRaw" TEXT NOT NULL,
-              "characterIDRaw" TEXT NOT NULL,
-              "countUnitRaw" TEXT NOT NULL,
-              "baselineSourceRaw" TEXT NOT NULL,
-              "baselineManualValue" REAL,
-              "goalTypeRaw" TEXT NOT NULL,
-              "goalValue" INTEGER,
-              "goalDate" TEXT,
-              "isArchived" INTEGER NOT NULL,
-              "sortOrder" INTEGER NOT NULL,
-              "createdAt" TEXT NOT NULL,
-              "updatedAt" TEXT NOT NULL
-            ) STRICT
-            """).execute(db)
+## 4. キャラクター設計
 
-        try #sql("""
-            CREATE TABLE "habitEvent" (
-              "id" TEXT NOT NULL PRIMARY KEY,
-              "habitID" TEXT NOT NULL,
-              "delta" INTEGER NOT NULL,
-              "sourceRaw" TEXT NOT NULL,
-              "occurredAt" TEXT NOT NULL,
-              "revokedAt" TEXT,
-              "createdAt" TEXT NOT NULL
-            ) STRICT
-            """).execute(db)
+### 4.1 Enum管理
 
-        try #sql("""
-            CREATE INDEX "idx_habitEvent_habitID_occurredAt"
-            ON "habitEvent"("habitID", "occurredAt")
-            """).execute(db)
+キャラクターIDの文字列直入力は廃止し、`CharacterType` enum で管理する。  
+UI上は enum の表示名（タイトル）を表示する。
 
-        try #sql("""
-            CREATE INDEX "idx_habitEvent_habitID_revokedAt"
-            ON "habitEvent"("habitID", "revokedAt")
-            """).execute(db)
-    }
+### 4.2 kind別デザイン方針
 
-    try migrator.migrate(database)
-    return database
-}
-```
+キャラクターは `kind` ごとに別デザインを用意する。
 
-アプリ起動時:
+アセット命名:
 
-```swift
-@main
-struct HabitPetApp: App {
-    init() {
-        prepareDependencies {
-            $0.defaultDatabase = try! appDatabase()
-        }
-    }
+- `character_<kind>_<character>_lv<level>`
+- 例: `character_nonSmoking_hamster_lv1`
 
-    var body: some Scene {
-        WindowGroup { MainPagerView() }
-    }
-}
-```
+`level` は 1...5 を維持する。
 
-## 6. DataStore 設計（書き込み専用）
+## 5. DB初期化
 
-- `HabitDataStore`
-  - `create(...)`
-  - `update(...)`
-  - `delete(id:)`
-  - `upsert(...)` (必要時のみ)
-- `HabitEventDataStore`
-  - `create(...)`
-  - `update(...)`
-  - `delete(id:)`
-  - `revokeLast(habitID:count:now:)` (Undo の実装)
+- migration は `Create tables` のみ。
+- スキーマ変更時は `eraseDatabaseOnSchemaChange`（DEBUG）で再生成する。
+- 既存データ移行処理は実装しない。
 
-禁止:
+## 6. Presentation方針
 
-- `find`, `fetch`, `list` などの読み取り API を DataStore に追加しない。
+- ViewModelは `@MainActor @Observable final class`。
+- 読み取りは `@FetchAll` / `@FetchOne`。
+- 書き込みは UseCase -> DataStore のみ。
+- Toolbarは SFSymbol ベースで構成する。
 
-## 7. UseCase 設計
+## 7. Widget連携
 
-- `CreateHabitUseCase`
-- `UpdateHabitUseCase`
-- `ArchiveHabitUseCase`
-- `RecordHabitDeltaUseCase`
-- `UndoHabitDeltaUseCase`
-- `ResolveHabitStateUseCase`
-
-実装方針:
-
-- `swift-dependencies` を使う。
-- プロトコルと本実装は同一ファイルに定義する。
-- バックエンドの protocol は `Sendable`。
-- 共有可変状態が必要な箇所のみ `actor` を使う。
-
-## 8. ViewModel 契約
-
-すべての ViewModel は次の順序で定義する。
-
-1. UI State
-2. Entity State（基本は `@ObservationIgnored @FetchAll/@FetchOne`。Edit は initializer 入力を保持）
-3. Action methods (`Void`)
-4. Utility / private helper
-
-## 8.1 MainPagerViewModel
-
-UI State:
-
-- `selectedPageIndex: Int`
-- `isEditPresented: Bool`
-- `isCreatePresented: Bool`
-
-Entity State:
-
-- `@FetchAll<Habit>(...) var habits`
-
-Action:
-
-- `onAppear()`
-- `onPageChanged(_:)`
-- `onTapEdit()`
-- `onTapAddPage()`
-
-## 8.2 HabitPageViewModel
-
-UI State:
-
-- `isHistoryPresented: Bool`
-- `isSettingsPresented: Bool`
-
-Entity State:
-
-- `@FetchOne<Habit>(...) var habit`
-- `@FetchOne<HabitStateSelection>(...) var state`
-- `@FetchAll<HabitRecentEventSelection>(...) var recentEvents`
-
-Action:
-
-- `onTapPlus(source:)`
-- `onTapMinus(source:)`
-- `onTapUndo(count:)`
-- `onTapEditHabit()`
-
-## 8.3 HabitEditViewModel
-
-UI State:
-
-- `editingHabit: Habit?` (initializer で受け取り、画面中は UI State として保持)
-- `nameInput: String`
-- `selectedModeRaw: String`
-- `selectedCharacterIDRaw: String`
-- `baselineInput: String`
-- `goalTypeRaw: String`
-- `goalValueInput: String`
-- `goalDate: Date?`
-- `isArchiveAlertPresented: Bool`
-
-Initializer:
-
-- `init(habit: Habit?)`
-
-Action:
-
-- `onAppearForCreate()`
-- `onChangeName(_:)`
-- `onChangeMode(_:)`
-- `onChangeCharacter(_:)`
-- `onChangeBaseline(_:)`
-- `onTapSave()` (`editingHabit` の有無で create/update を分岐し、DataStore 経由で保存)
-- `onTapArchive()`
-
-## 9. View 設計方針
-
-- View は state 描画 + action dispatch だけを行う。
-- 画面で DB へ直接アクセスしない。
-- `Task` 起点の非同期呼び出しは ViewModel 内で実施する。
-
-## 10. Undo (Pop) 仕様
-
-- Undo は削除ではなく `HabitEvent.revokedAt` を設定して無効化する。
-- 集計・状態・履歴は常に `revokedAt == nil` を対象にする。
-- `count` 件の Undo は「最新有効イベントから順に `count` 件」を無効化する。
-
-## 11. 画面一覧
-
-1. `OnboardingView`
-2. `MainPagerView`
-3. `HabitPageView`
-4. `HabitEditView`
-5. `HistorySheetView`
-6. `SettingsView`
-7. `WidgetHabitPetView`
-
-## 12. チェックリスト
-
-1. ViewModel は `@MainActor @Observable final class` か。
-2. Fetch property に `@ObservationIgnored` が付いているか。
-3. View から ViewModel への入力が Action メソッドだけか。
-4. Action メソッドは `Void` return か。
-5. DataStore が書き込み API のみか。
-6. `CREATE TABLE` migration が起動時に実行されるか。
-7. `defaultDatabase` の初期化が process 内で 1 回だけか。
+- Widgetの表示値・画像は共有DB正本から取得する。
+- App側の更新後は `WidgetCenter.shared.reloadTimelines` を呼び、反映を即時化する。
