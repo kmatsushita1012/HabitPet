@@ -77,6 +77,7 @@ final class MainPagerViewModel {
                     source: .app,
                     now: Date()
                 )
+                try await $activeEvents.load()
                 WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
             } catch {
                 errorMessage = error.localizedDescription
@@ -91,6 +92,7 @@ final class MainPagerViewModel {
         Task {
             do {
                 try habitUseCase.undoDelta(habitID: habit.id, count: 1, now: Date())
+                try await $activeEvents.load()
                 WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
             } catch {
                 errorMessage = error.localizedDescription
@@ -120,8 +122,12 @@ final class MainPagerViewModel {
 
     private func reloadData() {
         Task {
-            try? await $habits.load()
-            try? await $activeEvents.load()
+            try await loadEntities()
         }
+    }
+
+    private func loadEntities() async throws {
+        try await $habits.load()
+        try await $activeEvents.load()
     }
 }
