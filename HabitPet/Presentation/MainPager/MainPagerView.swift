@@ -40,7 +40,7 @@ struct MainPagerView: View {
                     }
                 }
             }
-            .navigationTitle("HabitPet")
+            .navigationTitle(viewModel.currentHabitTitle)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -125,12 +125,11 @@ private struct HabitPageCard: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                HabitCharacterImageView(habit: habit, totalCount: totalCount)
-                    .frame(maxWidth: .infinity)
-                HabitOverallStatusCard(habit: habit, timelineStatus: goalTimelineStatus)
-                    .frame(maxWidth: .infinity)
-            }
+            HabitTopStatusRow(
+                habit: habit,
+                totalCount: totalCount,
+                timelineStatus: goalTimelineStatus
+            )
             HabitTodayStatusCard(
                 todayCount: todayCount,
                 goalPerDay: habit.goalPerDay,
@@ -140,6 +139,32 @@ private struct HabitPageCard: View {
             )
             HabitHistoryChartCard(unit: habit.kind.unitTitle, series: recentDailySeries)
         }
+    }
+}
+
+private struct HabitTopStatusRow: View {
+    let habit: Habit
+    let totalCount: Int
+    let timelineStatus: MainPagerViewModel.GoalTimelineStatus
+
+    private let spacing: CGFloat = 12
+
+    var body: some View {
+        GeometryReader { proxy in
+            let totalWidth = max(proxy.size.width - spacing, 0)
+            let imageWidth = totalWidth * (2.0 / 3.0)
+            let statusWidth = totalWidth * (1.0 / 3.0)
+            let rowHeight = proxy.size.height
+
+            HStack(alignment: .top, spacing: spacing) {
+                HabitCharacterImageView(habit: habit, totalCount: totalCount)
+                    .frame(width: imageWidth, height: rowHeight)
+                HabitOverallStatusCard(habit: habit, timelineStatus: timelineStatus)
+                    .frame(width: statusWidth, height: rowHeight)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        }
+        .aspectRatio(2.0, contentMode: .fit)
     }
 }
 
@@ -153,7 +178,7 @@ private struct HabitOverallStatusCard: View {
                 .font(.title2.bold())
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
-            Text("種類: \(habit.kind.title)")
+            Text(habit.kind.title)
                 .foregroundStyle(.secondary)
 
             LabeledContent("目標") {
@@ -169,7 +194,7 @@ private struct HabitOverallStatusCard: View {
                 .font(.footnote)
                 .foregroundStyle(timelineStatus.isOverdue ? .red : .secondary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(10)
         .background(.ultraThinMaterial)
         .clipShape(.rect(cornerRadius: 8))

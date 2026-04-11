@@ -136,6 +136,11 @@ final class MainPagerViewModel {
         !habits.isEmpty && selectedPageIndex < habits.count - 1
     }
 
+    var currentHabitTitle: String {
+        guard let habit = selectedHabit else { return "HabitPet" }
+        return habit.name ?? habit.kind.title
+    }
+
     func todayCount(for habitID: Habit.ID) -> Int {
         let calendar = Calendar.current
         return activeEvents
