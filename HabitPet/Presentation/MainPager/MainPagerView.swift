@@ -125,11 +125,12 @@ private struct HabitPageCard: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .top) {
+            HStack(alignment: .top, spacing: 12) {
                 HabitCharacterImageView(habit: habit, totalCount: totalCount)
+                    .frame(maxWidth: .infinity)
                 HabitOverallStatusCard(habit: habit, timelineStatus: goalTimelineStatus)
+                    .frame(maxWidth: .infinity)
             }
-            
             HabitTodayStatusCard(
                 todayCount: todayCount,
                 goalPerDay: habit.goalPerDay,
@@ -150,10 +151,16 @@ private struct HabitOverallStatusCard: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(habit.name ?? habit.kind.title)
                 .font(.title2.bold())
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
             Text("種類: \(habit.kind.title)")
                 .foregroundStyle(.secondary)
-            Text("目標: \(habit.goalPerDay)\(habit.kind.unitTitle)/日")
-                .foregroundStyle(.secondary)
+
+            LabeledContent("目標") {
+                Text("\(habit.goalPerDay)\(habit.kind.unitTitle) / 日")
+                    .monospacedDigit()
+            }
+            .foregroundStyle(.secondary)
 
             ProgressView(value: timelineStatus.progress)
                 .tint(timelineStatus.isOverdue ? .red : .accentColor)
@@ -162,11 +169,10 @@ private struct HabitOverallStatusCard: View {
                 .font(.footnote)
                 .foregroundStyle(timelineStatus.isOverdue ? .red : .secondary)
         }
-        .fixedSize(horizontal: true, vertical: false)
-        .frame(alignment: .leading)
-        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
         .background(.ultraThinMaterial)
-        .clipShape(.rect(cornerRadius: 24))
+        .clipShape(.rect(cornerRadius: 8))
     }
 }
 
@@ -177,41 +183,53 @@ private struct HabitTodayStatusCard: View {
     let onTapCountUp: () -> Void
     let onTapUndo: () -> Void
 
+    @ScaledMetric(relativeTo: .body) private var controlHeight = 44.0
+
     var body: some View {
         let remaining = max(goalPerDay - todayCount, 0)
+        let progress = goalPerDay > 0 ? min(Double(todayCount) / Double(goalPerDay), 1) : 0
 
-        HStack {
-            VStack(alignment: .leading, spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("今日のステータス")
                     .font(.headline)
-                Text("今日: \(todayCount)\(unit) / 上限: \(goalPerDay)\(unit)")
-                    .monospacedDigit()
-                Text("残り: \(remaining)\(unit)")
-                    .foregroundStyle(.secondary)
+                LabeledContent("今日") {
+                    Text("\(todayCount)\(unit)")
+                        .monospacedDigit()
+                }
+                LabeledContent("残り") {
+                    Text("\(remaining)\(unit)")
+                        .monospacedDigit()
+                }
+                .foregroundStyle(.secondary)
+
+                ProgressView(value: progress)
+                    .tint(todayCount > goalPerDay ? .red : .accentColor)
             }
-            Spacer()
-            HStack(spacing: 12) {
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 8) {
                 Button(action: onTapCountUp) {
-                    Image(systemName: "plus")
-                        .frame(width: 32, height: 32)
+                    Label("増やす", systemImage: "plus")
+                        .labelStyle(.iconOnly)
+                        .frame(width: controlHeight, height: controlHeight)
                 }
                 .buttonStyle(.borderedProminent)
-                .clipShape(.circle)
-                
+
                 Button(action: onTapUndo) {
-                    Image(systemName: "minus")
-                        .frame(width: 32, height: 32)
+                    Label("減らす", systemImage: "minus")
+                        .labelStyle(.iconOnly)
+                        .frame(width: controlHeight, height: controlHeight)
                 }
                 .tint(.red)
                 .buttonStyle(.bordered)
-                .clipShape(.circle)
                 .disabled(todayCount == 0)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(.ultraThinMaterial)
-        .clipShape(.rect(cornerRadius: 24))
+        .clipShape(.rect(cornerRadius: 8))
     }
 }
 
@@ -220,6 +238,8 @@ private struct HabitHistoryChartCard: View {
     let series: [MainPagerViewModel.DailyCountPoint]
 
     var body: some View {
+        let maxCount = max(series.map(\.count).max() ?? 0, 1)
+
         VStack(alignment: .leading, spacing: 10) {
             Text("過去14日")
                 .font(.headline)
@@ -231,7 +251,9 @@ private struct HabitHistoryChartCard: View {
                 )
                 .foregroundStyle(.teal)
             }
-            .chartYScale(domain: 0...(max(series.map(\.count).max() ?? 0, 5)))
+            .chartYScale(domain: 0...maxCount)
+            .frame(maxWidth: .infinity)
+            .aspectRatio(16.0 / 9.0, contentMode: .fit)
 
             if let latest = series.last {
                 Text("直近: \(latest.count)\(unit)")
@@ -242,7 +264,7 @@ private struct HabitHistoryChartCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(.ultraThinMaterial)
-        .clipShape(.rect(cornerRadius: 24))
+        .clipShape(.rect(cornerRadius: 8))
     }
 }
 
@@ -258,15 +280,20 @@ private struct HabitCharacterImageView: View {
             if let image = AppCharacterImageLoader.load(named: names) {
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFit()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Image(systemName: "pawprint.fill")
                     .resizable()
                     .scaledToFit()
+                    .padding(.vertical, 24)
+                    .foregroundStyle(.secondary)
             }
         }
-        .aspectRatio(4 / 3, contentMode: .fit)
-        .clipped()
+        .frame(maxWidth: .infinity)
+        .aspectRatio(4.0 / 3.0, contentMode: .fit)
+        .background(.ultraThinMaterial)
+        .clipShape(.rect(cornerRadius: 8))
     }
 }
 
