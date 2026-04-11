@@ -7,6 +7,18 @@ import WidgetKit
 @MainActor
 @Observable
 final class MainPagerViewModel {
+    struct DailyCountPoint: Sendable, Identifiable {
+        var id: Date { date }
+        let date: Date
+        let count: Int
+    }
+
+    struct GoalTimelineStatus: Sendable {
+        let progress: Double
+        let caption: String
+        let isOverdue: Bool
+    }
+
     // UI State
     var selectedPageIndex: Int = 0
     var isEditPresented = false
@@ -137,6 +149,54 @@ final class MainPagerViewModel {
             }
     }
 
+    func recentDailyCounts(for habitID: Habit.ID, days: Int) -> [DailyCountPoint] {
+        guard days > 0 else { return [] }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        guard let startDate = calendar.date(byAdding: .day, value: -(days - 1), to: today) else {
+            return []
+        }
+
+        var dailyMap: [Date: Int] = [:]
+        for event in activeEvents where event.habitID == habitID && event.revokedAt == nil {
+            let day = calendar.startOfDay(for: event.occurredAt)
+            guard day >= startDate && day <= today else { continue }
+            dailyMap[day, default: 0] += event.delta
+        }
+
+        return (0..<days).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: offset, to: startDate) else { return nil }
+            return DailyCountPoint(date: date, count: dailyMap[date, default: 0])
+        }
+    }
+
+    func goalTimelineStatus(for habit: Habit) -> GoalTimelineStatus {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        guard let deadline = Self.goalDeadlineFormatter.date(from: habit.goalDeadline) else {
+            return GoalTimelineStatus(progress: 0, caption: "目標日を確認できません", isOverdue: false)
+        }
+
+        let deadlineDay = calendar.startOfDay(for: deadline)
+        let startDay = calendar.startOfDay(for: habit.createdAt)
+        let totalDays = max(calendar.dateComponents([.day], from: startDay, to: deadlineDay).day ?? 0, 1)
+        let elapsedDays = max(calendar.dateComponents([.day], from: startDay, to: today).day ?? 0, 0)
+        let remainingDays = calendar.dateComponents([.day], from: today, to: deadlineDay).day ?? 0
+        let progress = min(max(Double(elapsedDays) / Double(totalDays), 0), 1)
+        let isOverdue = today > deadlineDay
+
+        let caption: String
+        if isOverdue {
+            caption = "目標日を過ぎています"
+        } else if remainingDays == 0 {
+            caption = "目標日まであと0日"
+        } else {
+            caption = "目標日まであと\(remainingDays)日"
+        }
+
+        return GoalTimelineStatus(progress: progress, caption: caption, isOverdue: isOverdue)
+    }
+
     func totalCount(for habitID: Habit.ID) -> Int {
         activeEvents
             .filter { $0.habitID == habitID && $0.revokedAt == nil }
@@ -161,4 +221,12 @@ final class MainPagerViewModel {
         try await $habits.load()
         try await $activeEvents.load()
     }
+
+    private static let goalDeadlineFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 }

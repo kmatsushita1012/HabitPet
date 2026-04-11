@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 import UIKit
 
@@ -21,8 +22,10 @@ struct MainPagerView: View {
                         ForEach(Array(viewModel.habits.enumerated()), id: \.element.id) { index, habit in
                             HabitPageCard(
                                 habit: habit,
-                                todayCount: viewModel.todayCount(for: habit.id),
                                 totalCount: viewModel.totalCount(for: habit.id),
+                                todayCount: viewModel.todayCount(for: habit.id),
+                                goalTimelineStatus: viewModel.goalTimelineStatus(for: habit),
+                                recentDailySeries: viewModel.recentDailyCounts(for: habit.id, days: 14),
                                 onTapCountUp: { viewModel.onTapCountUp() },
                                 onTapUndo: { viewModel.onTapUndoCount() }
                             )
@@ -113,100 +116,134 @@ struct MainPagerView: View {
 
 private struct HabitPageCard: View {
     let habit: Habit
-    let todayCount: Int
     let totalCount: Int
+    let todayCount: Int
+    let goalTimelineStatus: MainPagerViewModel.GoalTimelineStatus
+    let recentDailySeries: [MainPagerViewModel.DailyCountPoint]
     let onTapCountUp: () -> Void
     let onTapUndo: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
-            // MARK: レイアウトは変更しないこと
-            HabitCharacterImageView(habit: habit, totalCount: totalCount)
-                .aspectRatio(1, contentMode: .fit)
-            HStack{
-                detailCard
-                HabitStatusView(
-                    todayCount: todayCount,
-                    goalPerDay: habit.goalPerDay,
-                    unit: habit.kind.unitTitle
-                )
-                // TODO: detailCardとHabitStatusViewの内容を統合して整理　より見やすく
+        VStack(spacing: 12) {
+            HStack {
+                HabitCharacterImageView(habit: habit, totalCount: totalCount)
+                    .aspectRatio(1, contentMode: .fit)
+                HabitOverallStatusCard(habit: habit, timelineStatus: goalTimelineStatus)
             }
-            // TODO: 過去の分析を含めた詳細なAnalyticsView
-        }
-
-        
-
-        Spacer(minLength: 0)
-    }
-
-    @ViewBuilder
-    var detailCard: some View {
-        HStack{
-            VStack(alignment: .leading, spacing: 6) {
-                Text(habit.name ?? habit.kind.title)
-                    .font(.title2.bold())
-                Text(habit.character.title)
-                    .foregroundStyle(.secondary)
-                Text("種類: \(habit.kind.title)")
-                    .foregroundStyle(.secondary)
-                Text("今日の記録: \(todayCount)\(habit.kind.unitTitle)")
-                    .font(.headline)
-                    .monospacedDigit()
-                
-                HStack(spacing: 12) {
-                    Button(action: onTapUndo) {
-                        Label("取り消し", systemImage: "arrow.uturn.backward")
-                            .labelStyle(.iconOnly)
-                    }
-                    .tint(.red)
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                    .disabled(totalCount == 0)
-                    
-                    Button(action: onTapCountUp) {
-                        Label("記録", systemImage: "plus")
-                            .labelStyle(.iconOnly)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                }
-            }
-            .frame(alignment: .leading)
-            .padding(16)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            // 過去にわたっての棒グラフなどを追加
-            // まだViewの1/2ぐらい余っている
+            
+            HabitTodayStatusCard(
+                todayCount: todayCount,
+                goalPerDay: habit.goalPerDay,
+                unit: habit.kind.unitTitle,
+                onTapCountUp: onTapCountUp,
+                onTapUndo: onTapUndo
+            )
+            HabitHistoryChartCard(unit: habit.kind.unitTitle, series: recentDailySeries)
         }
     }
 }
 
-private struct HabitStatusView: View {
+private struct HabitOverallStatusCard: View {
+    let habit: Habit
+    let timelineStatus: MainPagerViewModel.GoalTimelineStatus
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(habit.name ?? habit.kind.title)
+                .font(.title2.bold())
+            Text("種類: \(habit.kind.title)")
+                .foregroundStyle(.secondary)
+            Text("目標: \(habit.goalPerDay)\(habit.kind.unitTitle)/日")
+                .foregroundStyle(.secondary)
+
+            ProgressView(value: timelineStatus.progress)
+                .fixedSize()
+                .tint(timelineStatus.isOverdue ? .red : .accentColor)
+
+            Text(timelineStatus.caption)
+                .font(.footnote)
+                .foregroundStyle(timelineStatus.isOverdue ? .red : .secondary)
+        }
+        .frame(alignment: .leading)
+        .padding(12)
+        .background(.ultraThinMaterial)
+        .clipShape(.rect(cornerRadius: 8))
+    }
+}
+
+private struct HabitTodayStatusCard: View {
     let todayCount: Int
     let goalPerDay: Int
     let unit: String
+    let onTapCountUp: () -> Void
+    let onTapUndo: () -> Void
 
     var body: some View {
         let remaining = max(goalPerDay - todayCount, 0)
-        let progress = goalPerDay > 0 ? min(Double(todayCount) / Double(goalPerDay), 1) : 0
 
-        VStack(alignment: .leading, spacing: 6) {
-            Text("進捗")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Text("今日の上限: \(goalPerDay)\(unit)")
-                .foregroundStyle(.secondary)
-            Text("残り: \(remaining)\(unit)")
-                .monospacedDigit()
-            ProgressView(value: progress)
-                .tint(progress >= 1 ? .red : .accentColor)
-                // TODO: もっと太く
+        HStack {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("今日のステータス")
+                    .font(.headline)
+                Text("今日: \(todayCount)\(unit) / 上限: \(goalPerDay)\(unit)")
+                    .monospacedDigit()
+                Text("残り: \(remaining)\(unit)")
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            HStack(spacing: 12) {
+                Button(action: onTapCountUp) {
+                    Image(systemName: "plus")
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.borderedProminent)
+                .clipShape(.circle)
+                
+                Button(action: onTapUndo) {
+                    Image(systemName: "minus")
+                        .frame(width: 32, height: 32)
+                }
+                .tint(.red)
+                .buttonStyle(.bordered)
+                .clipShape(.circle)
+                .disabled(todayCount == 0)
+            }
         }
-        .frame(alignment: .leading)
-        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
         .background(.ultraThinMaterial)
-        .clipShape(.rect(cornerRadius: 16))
+        .clipShape(.rect(cornerRadius: 8))
+    }
+}
+
+private struct HabitHistoryChartCard: View {
+    let unit: String
+    let series: [MainPagerViewModel.DailyCountPoint]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("過去14日")
+                .font(.headline)
+
+            Chart(series) { point in
+                BarMark(
+                    x: .value("日付", point.date, unit: .day),
+                    y: .value("記録", point.count)
+                )
+                .foregroundStyle(.teal)
+            }
+            .chartYScale(domain: 0...(max(series.map(\.count).max() ?? 0, 5)))
+
+            if let latest = series.last {
+                Text("直近: \(latest.count)\(unit)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(.ultraThinMaterial)
+        .clipShape(.rect(cornerRadius: 8))
     }
 }
 
@@ -215,18 +252,18 @@ private struct HabitCharacterImageView: View {
     let totalCount: Int
 
     var body: some View {
-    let level = habitStateLevel(forTotalCount: totalCount)
-    let names = habitCharacterAssetNames(kind: habit.kind, character: habit.character, level: level)
+        let level = habitStateLevel(forTotalCount: totalCount)
+        let names = habitCharacterAssetNames(kind: habit.kind, character: habit.character, level: level)
 
         Group {
-        if let image = AppCharacterImageLoader.load(named: names) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-        } else {
-            Image(systemName: "pawprint.fill")
-                .resizable()
-                .scaledToFit()
+            if let image = AppCharacterImageLoader.load(named: names) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                Image(systemName: "pawprint.fill")
+                    .resizable()
+                    .scaledToFit()
             }
         }
     }
