@@ -1,24 +1,24 @@
 import AppIntents
+import SQLiteData
 import SwiftUI
 import UIKit
 import WidgetKit
 
 private struct HabitCounterEntry: TimelineEntry {
     let date: Date
-    let count: Int
 }
 
 private struct HabitCounterProvider: TimelineProvider {
     func placeholder(in context: Context) -> HabitCounterEntry {
-        HabitCounterEntry(date: .now, count: 0)
+        HabitCounterEntry(date: .now)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (HabitCounterEntry) -> Void) {
-        completion(HabitCounterEntry(date: .now, count: WidgetCountStore.currentCount()))
+        completion(HabitCounterEntry(date: .now))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<HabitCounterEntry>) -> Void) {
-        let entry = HabitCounterEntry(date: .now, count: WidgetCountStore.currentCount())
+        let entry = HabitCounterEntry(date: .now)
         completion(Timeline(entries: [entry], policy: .after(.now.addingTimeInterval(15 * 60))))
     }
 }
@@ -39,36 +39,70 @@ struct HabitPetWidget: Widget {
 private struct HabitPetWidgetView: View {
     let entry: HabitCounterEntry
 
+    @FetchAll(
+        Habit
+            .where { $0.isArchived.eq(false) }
+            .order { $0.sortOrder.asc() }
+    )
+    private var habits
+
+    @FetchAll(
+        HabitEvent.all
+    )
+    private var activeEvents
+    
+    @FetchOne private var currentCount: Int = 0
+    
+    init(entry: HabitCounterEntry) {
+        self.entry = entry
+        if let habitId = habits.first?.id {
+            _currentCount = FetchOne(
+                wrappedValue: 0,
+                HabitEvent
+                    .where{
+                        $0.habitID.eq(habitId)
+                            .and($0.revokedAt.is(nil))
+                    }.select{ $0.delta.total() })
+        }
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
                 characterImage
                     .resizable()
                     .scaledToFit()
+                    .frame(maxHeight: 72)
                 Spacer()
             }
             Spacer(minLength: 0)
 
-            HStack(spacing: 8) {
-                Text("\(entry.count)本")
+            HStack(spacing: 6) {
+                Text("\(currentCount)本")
                     .font(.callout.bold())
                     .monospacedDigit()
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                Spacer(minLength: 6)
-                Button(intent: CountUpIntent()) {
-                    Text("+")
-                        .font(.caption.bold())
-                        .frame(width: 22, height: 22)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 4)
+                if let habitID = currentHabit?.id.uuidString {
+                    Button(intent: CountUpIntent(habitID: habitID)) {
+                        Label("追加", systemImage: "plus")
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.borderedProminent)
             }
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
         .containerBackground(.fill.tertiary, for: .widget)
     }
 
     private var characterImage: Image {
-        let name = "character_hamster_lv\(stateLevel)"
+        guard let characterID = currentHabit?.characterID else {
+            return Image(systemName: "pawprint.fill")
+        }
+        let name = "character_\(characterID)_lv\(stateLevel)"
         if let uiImage = WidgetCharacterImageLoader.load(named: name) {
             return Image(uiImage: uiImage)
         } else {
@@ -76,19 +110,12 @@ private struct HabitPetWidgetView: View {
         }
     }
 
+    private var currentHabit: Habit? {
+        habits.first
+    }
+    
     private var stateLevel: Int {
-        switch entry.count {
-        case ..<5:
-            return 1
-        case ..<10:
-            return 2
-        case ..<20:
-            return 3
-        case ..<30:
-            return 4
-        default:
-            return 5
-        }
+        habitStateLevel(forTotalCount: currentCount)
     }
 }
 
@@ -111,27 +138,32 @@ private enum WidgetCharacterImageLoader {
 
 struct CountUpIntent: AppIntent {
     static var title: LocalizedStringResource = "カウントを1増やす"
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Habit ID")
+    var habitID: String
+
+    init() {
+        self.habitID = ""
+    }
+
+    init(habitID: String) {
+        self.habitID = habitID
+    }
 
     func perform() async throws -> some IntentResult {
-        _ = WidgetCountStore.increment()
+        guard let parsedHabitID = UUID(uuidString: habitID) else {
+            return .result()
+        }
+
+        let useCase = HabitUseCase()
+        try useCase.recordDelta(
+            habitID: parsedHabitID,
+            delta: 1,
+            source: .widget,
+            now: Date()
+        )
         WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
         return .result()
-    }
-}
-
-private enum WidgetCountStore {
-    static let appGroupID = "group.com.studiomk.HabitPet"
-    static let countKey = "widget_count"
-    static let sharedDefaults = UserDefaults(suiteName: appGroupID) ?? .standard
-
-    static func currentCount() -> Int {
-        sharedDefaults.integer(forKey: countKey)
-    }
-
-    @discardableResult
-    static func increment() -> Int {
-        let newValue = currentCount() + 1
-        sharedDefaults.set(newValue, forKey: countKey)
-        return newValue
     }
 }

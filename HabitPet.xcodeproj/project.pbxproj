@@ -10,6 +10,8 @@
 		A10010012F80000100E438FD /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = A10010112F80000100E438FD /* Dependencies */; };
 		A10010022F80000100E438FD /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = A10010122F80000100E438FD /* SQLiteData */; };
 		B20000012FA0000100AAA001 /* HabitPetWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B20000022FA0000100AAA001 /* HabitPetWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C10010012FA0000100BBB001 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = C10010112FA0000100BBB001 /* Dependencies */; };
+		C10010022FA0000100BBB001 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = C10010122FA0000100BBB001 /* SQLiteData */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -91,6 +93,11 @@
 			path = HabitPetWidget;
 			sourceTree = "<group>";
 		};
+		C10000112FA0000100BBB001 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -121,6 +128,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C10010012FA0000100BBB001 /* Dependencies in Frameworks */,
+				C10010022FA0000100BBB001 /* SQLiteData in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -131,6 +140,7 @@
 			isa = PBXGroup;
 			children = (
 				2937194B2F82B3E7009D8D07 /* HabitPet */,
+				C10000112FA0000100BBB001 /* Shared */,
 				B20000032FA0000100AAA001 /* HabitPetWidget */,
 				293719592F82B3E8009D8D07 /* HabitPetTests */,
 				293719632F82B3E8009D8D07 /* HabitPetUITests */,
@@ -168,6 +178,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				2937194B2F82B3E7009D8D07 /* HabitPet */,
+				C10000112FA0000100BBB001 /* Shared */,
 			);
 			name = HabitPet;
 			packageProductDependencies = (
@@ -238,9 +249,12 @@
 			);
 			fileSystemSynchronizedGroups = (
 				B20000032FA0000100AAA001 /* HabitPetWidget */,
+				C10000112FA0000100BBB001 /* Shared */,
 			);
 			name = HabitPetWidget;
 			packageProductDependencies = (
+				C10010112FA0000100BBB001 /* Dependencies */,
+				C10010122FA0000100BBB001 /* SQLiteData */,
 			);
 			productName = HabitPetWidget;
 			productReference = B20000022FA0000100AAA001 /* HabitPetWidget.appex */;
@@ -819,6 +833,16 @@
 			productName = Dependencies;
 		};
 		A10010122F80000100E438FD /* SQLiteData */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10010222F80000100E438FD /* XCRemoteSwiftPackageReference "sqlite-data" */;
+			productName = SQLiteData;
+		};
+		C10010112FA0000100BBB001 /* Dependencies */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10010212F80000100E438FD /* XCRemoteSwiftPackageReference "swift-dependencies" */;
+			productName = Dependencies;
+		};
+		C10010122FA0000100BBB001 /* SQLiteData */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A10010222F80000100E438FD /* XCRemoteSwiftPackageReference "sqlite-data" */;
 			productName = SQLiteData;

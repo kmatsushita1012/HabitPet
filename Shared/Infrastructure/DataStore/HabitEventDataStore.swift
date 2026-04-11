@@ -37,10 +37,11 @@ struct HabitEventDataStore: HabitEventDataStoreProtocol, Sendable {
         @Dependency(\.defaultDatabase) var database
         try database.write { db in
             let latestEvents = try HabitEvent
-                .where { $0.habitID.eq(habitID).and($0.revokedAt.eq(nil as Date?)) }
+                .where { $0.habitID.eq(habitID) }
                 .order { $0.occurredAt.desc() }
-                .limit(count)
                 .fetchAll(db)
+                .filter { $0.revokedAt == nil }
+                .prefix(count)
 
             for var event in latestEvents {
                 event.revokedAt = now

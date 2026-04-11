@@ -44,6 +44,7 @@ struct Habit: Sendable, Identifiable {
     var goalDate: String?
     var isArchived: Bool
     var sortOrder: Int
+    
     var createdAt: Date
     var updatedAt: Date
 }
@@ -101,4 +102,19 @@ struct HabitCardSelection: Sendable, Identifiable {
     var stateLevel: Int
 
     var id: Habit.ID { habit.id }
+}
+
+func habitStateLevel(forTotalCount totalCount: Int) -> Int {
+    switch totalCount {
+    case ..<5:
+        return 1
+    case ..<10:
+        return 2
+    case ..<20:
+        return 3
+    case ..<30:
+        return 4
+    default:
+        return 5
+    }
 }

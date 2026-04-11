@@ -71,6 +71,18 @@ final class HabitEditViewModel {
 
     func onChangeGoalType(_ type: HabitGoalType) {
         goalType = type
+        switch type {
+        case .none:
+            goalValueInput = ""
+            goalDate = nil
+        case .count:
+            goalDate = nil
+        case .date:
+            goalValueInput = ""
+            if goalDate == nil {
+                goalDate = Date()
+            }
+        }
     }
 
     func onChangeGoalValue(_ value: String) {
@@ -87,6 +99,19 @@ final class HabitEditViewModel {
                 let goalDateString = goalDate.map { dateFormatter.string(from: $0) }
                 let baselineValue = Double(baselineInput)
                 let goalValue = Int(goalValueInput)
+                let normalizedGoalValue: Int?
+                let normalizedGoalDate: String?
+                switch goalType {
+                case .none:
+                    normalizedGoalValue = nil
+                    normalizedGoalDate = nil
+                case .count:
+                    normalizedGoalValue = goalValue
+                    normalizedGoalDate = nil
+                case .date:
+                    normalizedGoalValue = nil
+                    normalizedGoalDate = goalDateString
+                }
 
                 if var habit = editingHabit {
                     habit.name = nameInput
@@ -96,8 +121,8 @@ final class HabitEditViewModel {
                     habit.baselineSource = .manual
                     habit.baselineManualValue = baselineValue
                     habit.goalType = goalType
-                    habit.goalValue = goalValue
-                    habit.goalDate = goalDateString
+                    habit.goalValue = normalizedGoalValue
+                    habit.goalDate = normalizedGoalDate
                     try habitUseCase.updateHabit(habit, now: Date())
                 } else {
                     let draft = HabitDraft(
@@ -108,8 +133,8 @@ final class HabitEditViewModel {
                         baselineSource: .manual,
                         baselineManualValue: baselineValue,
                         goalType: goalType,
-                        goalValue: goalValue,
-                        goalDate: goalDateString,
+                        goalValue: normalizedGoalValue,
+                        goalDate: normalizedGoalDate,
                         sortOrder: 0
                     )
                     _ = try habitUseCase.createHabit(draft, now: Date())

@@ -11,7 +11,6 @@ final class MainPagerViewModel {
     var isEditPresented = false
     var isCreatePresented = false
     var editingHabit: Habit?
-    var quickCount: Int = 0
     var errorMessage: String?
 
     // Entity State
@@ -24,12 +23,16 @@ final class MainPagerViewModel {
     var habits
 
     @ObservationIgnored
+    @FetchAll(
+        HabitEvent.all
+    )
+    var activeEvents
+
+    @ObservationIgnored
     @Dependency(\.habitUseCase) private var habitUseCase
 
     // Action methods
-    func onAppear() {
-        quickCount = WidgetCountStore.currentCount()
-    }
+    func onAppear() {}
 
     func onPageChanged(_ index: Int) {
         selectedPageIndex = index
@@ -57,9 +60,7 @@ final class MainPagerViewModel {
     }
 
     func onTapCountUp() {
-        guard !habits.isEmpty else { return }
-        let safeIndex = min(max(selectedPageIndex, 0), habits.count - 1)
-        let habit = habits[safeIndex]
+        guard let habit = selectedHabit else { return }
 
         Task {
             do {
@@ -69,7 +70,6 @@ final class MainPagerViewModel {
                     source: .app,
                     now: Date()
                 )
-                quickCount = WidgetCountStore.increment()
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -77,42 +77,35 @@ final class MainPagerViewModel {
     }
 
     func onTapUndoCount() {
-        guard !habits.isEmpty else { return }
-        let safeIndex = min(max(selectedPageIndex, 0), habits.count - 1)
-        let habit = habits[safeIndex]
-        guard quickCount > 0 else { return }
+        guard let habit = selectedHabit else { return }
+        guard selectedHabitTotalCount > 0 else { return }
 
         Task {
             do {
                 try habitUseCase.undoDelta(habitID: habit.id, count: 1, now: Date())
-                quickCount = WidgetCountStore.decrement()
             } catch {
                 errorMessage = error.localizedDescription
             }
         }
     }
-}
 
-private enum WidgetCountStore {
-    static let appGroupID = "group.com.studiomk.HabitPet"
-    static let countKey = "widget_count"
-    static let sharedDefaults = UserDefaults(suiteName: appGroupID) ?? .standard
-
-    static func currentCount() -> Int {
-        sharedDefaults.integer(forKey: countKey)
+    // Utilities
+    var selectedHabitTotalCount: Int {
+        guard let habitID = selectedHabit?.id else { return 0 }
+        return totalCount(for: habitID)
     }
 
-    @discardableResult
-    static func increment() -> Int {
-        let newValue = currentCount() + 1
-        sharedDefaults.set(newValue, forKey: countKey)
-        return newValue
+    func totalCount(for habitID: Habit.ID) -> Int {
+        activeEvents
+            .filter { $0.habitID == habitID && $0.revokedAt == nil }
+            .reduce(into: 0) { partialResult, event in
+                partialResult += event.delta
+            }
     }
 
-    @discardableResult
-    static func decrement() -> Int {
-        let newValue = max(0, currentCount() - 1)
-        sharedDefaults.set(newValue, forKey: countKey)
-        return newValue
+    private var selectedHabit: Habit? {
+        guard !habits.isEmpty else { return nil }
+        let safeIndex = min(max(selectedPageIndex, 0), habits.count - 1)
+        return habits[safeIndex]
     }
 }
