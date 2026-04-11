@@ -8,8 +8,9 @@ struct HabitEditView: View {
         @Bindable var viewModel = viewModel
 
         NavigationStack {
+            // TODO: HorizontalのScrollPickerと相性が悪いのでFormをやめてカスタムViewに変更
             Form {
-                Section(L10n.kindSection) {
+                Section {
                     Picker(
                         L10n.kindTitle,
                         selection: Binding(
@@ -21,8 +22,15 @@ struct HabitEditView: View {
                             Text(kind.title).tag(kind)
                         }
                     }
+                    TextField(
+                        L10n.namePlaceholder,
+                        text: Binding(
+                            get: { viewModel.nameInput },
+                            set: { viewModel.onChangeName($0) }
+                        )
+                    )
                 }
-
+                // TODO: HorizontalのScrollPickerに変更
                 Section(L10n.characterSection) {
                     Picker(
                         L10n.characterTitle,
@@ -37,17 +45,8 @@ struct HabitEditView: View {
                     }
                 }
 
-                Section(L10n.nameSection) {
-                    TextField(
-                        L10n.namePlaceholder,
-                        text: Binding(
-                            get: { viewModel.nameInput },
-                            set: { viewModel.onChangeName($0) }
-                        )
-                    )
-                }
-
                 Section(L10n.goalSection) {
+                    // TODO: Date自体のLocalize
                     DatePicker(
                         L10n.goalDeadlineTitle,
                         selection: Binding(
@@ -56,15 +55,19 @@ struct HabitEditView: View {
                         ),
                         displayedComponents: [.date]
                     )
-
-                    TextField(
-                        "\(L10n.goalPerDayTitle)（\(viewModel.selectedKind.unitTitle)）",
-                        text: Binding(
-                            get: { viewModel.goalPerDayInput },
-                            set: { viewModel.onChangeGoalPerDay($0) }
+                    LabeledContent(
+                        "\(L10n.goalPerDayTitle)（\(viewModel.selectedKind.unitTitle)"
+                    ){
+                        TextField(
+                            "本数・杯数",
+                            text: Binding(
+                                get: { viewModel.goalPerDayInput },
+                                set: { viewModel.onChangeGoalPerDay($0) }
+                            )
                         )
-                    )
-                    .keyboardType(.numberPad)
+                        .keyboardType(.numberPad)
+                    }
+                    .multilineTextAlignment(.trailing)
                 }
 
                 if viewModel.editingHabit == nil {
@@ -96,6 +99,7 @@ struct HabitEditView: View {
                         Image(systemName: "checkmark")
                     }
                     .accessibilityLabel(L10n.saveButton)
+                    .buttonStyle(.borderedProminent)
                 }
             }
             .alert(L10n.archiveAlertTitle, isPresented: $viewModel.isArchiveAlertPresented) {
@@ -130,16 +134,17 @@ private func yesterdayCountSection(viewModel: HabitEditViewModel) -> some View {
     let title = "\(L10n.yesterdayCountTitle)（\(viewModel.selectedKind.unitTitle)）"
 
     Section {
-        TextField(
-            title,
-            text: Binding(
-                get: { viewModel.yesterdayCountInput },
-                set: { viewModel.onChangeYesterdayCount($0) }
+        LabeledContent(title) {
+            TextField(
+                L10n.yesterdayCountTitle, // TODO: もっとシンプルなテキストに
+                text: Binding(
+                    get: { viewModel.yesterdayCountInput },
+                    set: { viewModel.onChangeYesterdayCount($0) }
+                )
             )
-        )
-        .keyboardType(.numberPad)
-    } header: {
-        Text(L10n.yesterdaySection)
+            .keyboardType(.numberPad)
+        }
+        .multilineTextAlignment(.trailing)
     } footer: {
         Text(L10n.yesterdayFooter)
     }
@@ -151,11 +156,11 @@ private enum L10n {
     static let characterSection = String(localized: "habit_edit.section.character", defaultValue: "キャラクター")
     static let characterTitle = String(localized: "habit_edit.field.character", defaultValue: "キャラクター")
     static let nameSection = String(localized: "habit_edit.section.name", defaultValue: "習慣名（任意）")
-    static let namePlaceholder = String(localized: "habit_edit.field.name", defaultValue: "例: 夜の1本をやめる")
+    static let namePlaceholder = String(localized: "habit_edit.field.name", defaultValue: "タイトル（例: 夜の1本をやめる）")
     static let goalSection = String(localized: "habit_edit.section.goal", defaultValue: "目標")
     static let goalDeadlineTitle = String(localized: "habit_edit.field.goal_deadline", defaultValue: "何日まで")
     static let goalPerDayTitle = String(localized: "habit_edit.field.goal_per_day", defaultValue: "1日あたり上限")
-    static let yesterdaySection = String(localized: "habit_edit.section.yesterday", defaultValue: "昨日の記録（作成時のみ）")
+    static let yesterdaySection = String(localized: "habit_edit.section.yesterday", defaultValue: "昨日の記録")
     static let yesterdayCountTitle = String(localized: "habit_edit.field.yesterday_count", defaultValue: "昨日の記録")
     static let yesterdayFooter = String(localized: "habit_edit.field.yesterday_footer", defaultValue: "保存時に「昨日」のイベントとして登録されます。")
     static let archiveButton = String(localized: "habit_edit.button.archive", defaultValue: "アーカイブ")
