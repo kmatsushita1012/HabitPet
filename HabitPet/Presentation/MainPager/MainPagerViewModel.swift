@@ -2,6 +2,7 @@ import Dependencies
 import Foundation
 import Observation
 import SQLiteData
+import WidgetKit
 
 @MainActor
 @Observable
@@ -32,7 +33,13 @@ final class MainPagerViewModel {
     @Dependency(\.habitUseCase) private var habitUseCase
 
     // Action methods
-    func onAppear() {}
+    func onAppear() {
+        reloadData()
+    }
+
+    func onAppDidBecomeActive() {
+        reloadData()
+    }
 
     func onPageChanged(_ index: Int) {
         selectedPageIndex = index
@@ -70,6 +77,7 @@ final class MainPagerViewModel {
                     source: .app,
                     now: Date()
                 )
+                WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -83,6 +91,7 @@ final class MainPagerViewModel {
         Task {
             do {
                 try habitUseCase.undoDelta(habitID: habit.id, count: 1, now: Date())
+                WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -107,5 +116,12 @@ final class MainPagerViewModel {
         guard !habits.isEmpty else { return nil }
         let safeIndex = min(max(selectedPageIndex, 0), habits.count - 1)
         return habits[safeIndex]
+    }
+
+    private func reloadData() {
+        Task {
+            try? await $habits.load()
+            try? await $activeEvents.load()
+        }
     }
 }

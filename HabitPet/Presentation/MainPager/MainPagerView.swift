@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainPagerView: View {
     @State private var viewModel = MainPagerViewModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         @Bindable var viewModel = viewModel
@@ -88,6 +89,10 @@ struct MainPagerView: View {
         }
         .onAppear {
             viewModel.onAppear()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            viewModel.onAppDidBecomeActive()
         }
         .sheet(
             isPresented: $viewModel.isCreatePresented,

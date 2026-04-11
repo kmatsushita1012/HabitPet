@@ -1,6 +1,7 @@
 import Dependencies
 import Foundation
 import Observation
+import WidgetKit
 
 @MainActor
 @Observable
@@ -140,6 +141,7 @@ final class HabitEditViewModel {
                     _ = try habitUseCase.createHabit(draft, now: Date())
                 }
 
+                WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
                 shouldDismiss = true
             } catch {
                 errorMessage = error.localizedDescription
@@ -152,6 +154,7 @@ final class HabitEditViewModel {
         Task {
             do {
                 try habitUseCase.archiveHabit(editingHabit, now: Date())
+                WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
                 shouldDismiss = true
             } catch {
                 errorMessage = error.localizedDescription
