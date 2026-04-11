@@ -125,9 +125,8 @@ private struct HabitPageCard: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack {
+            HStack(alignment: .top) {
                 HabitCharacterImageView(habit: habit, totalCount: totalCount)
-                    .aspectRatio(1, contentMode: .fit)
                 HabitOverallStatusCard(habit: habit, timelineStatus: goalTimelineStatus)
             }
             
@@ -157,17 +156,17 @@ private struct HabitOverallStatusCard: View {
                 .foregroundStyle(.secondary)
 
             ProgressView(value: timelineStatus.progress)
-                .fixedSize()
                 .tint(timelineStatus.isOverdue ? .red : .accentColor)
 
             Text(timelineStatus.caption)
                 .font(.footnote)
                 .foregroundStyle(timelineStatus.isOverdue ? .red : .secondary)
         }
+        .fixedSize(horizontal: true, vertical: false)
         .frame(alignment: .leading)
         .padding(12)
         .background(.ultraThinMaterial)
-        .clipShape(.rect(cornerRadius: 8))
+        .clipShape(.rect(cornerRadius: 24))
     }
 }
 
@@ -212,7 +211,7 @@ private struct HabitTodayStatusCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(.ultraThinMaterial)
-        .clipShape(.rect(cornerRadius: 8))
+        .clipShape(.rect(cornerRadius: 24))
     }
 }
 
@@ -243,7 +242,7 @@ private struct HabitHistoryChartCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(.ultraThinMaterial)
-        .clipShape(.rect(cornerRadius: 8))
+        .clipShape(.rect(cornerRadius: 24))
     }
 }
 
@@ -266,6 +265,8 @@ private struct HabitCharacterImageView: View {
                     .scaledToFit()
             }
         }
+        .aspectRatio(4 / 3, contentMode: .fit)
+        .clipped()
     }
 }
 
