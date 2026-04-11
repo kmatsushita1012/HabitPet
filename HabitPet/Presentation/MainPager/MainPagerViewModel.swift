@@ -57,6 +57,16 @@ final class MainPagerViewModel {
         isCreatePresented = true
     }
 
+    func onTapPreviousPage() {
+        guard canMoveToPreviousPage else { return }
+        selectedPageIndex -= 1
+    }
+
+    func onTapNextPage() {
+        guard canMoveToNextPage else { return }
+        selectedPageIndex += 1
+    }
+
     func onDismissEdit() {
         isEditPresented = false
         editingHabit = nil
@@ -104,6 +114,27 @@ final class MainPagerViewModel {
     var selectedHabitTotalCount: Int {
         guard let habitID = selectedHabit?.id else { return 0 }
         return totalCount(for: habitID)
+    }
+
+    var canMoveToPreviousPage: Bool {
+        selectedPageIndex > 0
+    }
+
+    var canMoveToNextPage: Bool {
+        !habits.isEmpty && selectedPageIndex < habits.count - 1
+    }
+
+    func todayCount(for habitID: Habit.ID) -> Int {
+        let calendar = Calendar.current
+        return activeEvents
+            .filter {
+                $0.habitID == habitID &&
+                $0.revokedAt == nil &&
+                calendar.isDateInToday($0.occurredAt)
+            }
+            .reduce(into: 0) { partialResult, event in
+                partialResult += event.delta
+            }
     }
 
     func totalCount(for habitID: Habit.ID) -> Int {

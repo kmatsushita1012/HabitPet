@@ -19,37 +19,15 @@ struct MainPagerView: View {
                 } else {
                     TabView(selection: $viewModel.selectedPageIndex) {
                         ForEach(Array(viewModel.habits.enumerated()), id: \.element.id) { index, habit in
-                            let totalCount = viewModel.totalCount(for: habit.id)
-                            VStack(spacing: 12) {
-                                characterImage(for: habit, totalCount: totalCount)
-                                    .frame(width: 120, height: 120)
-
-                                Text(habit.name ?? habit.kind.title)
-                                    .font(.title2.bold())
-                                Text("種類: \(habit.kind.title) / キャラクター: \(habit.character.title)")
-                                    .foregroundStyle(.secondary)
-
-                                Text("クイック記録（総和）: \(totalCount)\(habit.kind.unitTitle)")
-                                    .font(.headline)
-                                    .monospacedDigit()
-
-                                HStack(spacing: 12) {
-                                    Button {
-                                        viewModel.onTapCountUp()
-                                    } label: {
-                                        Label("+1 記録", systemImage: "plus.circle.fill")
-                                    }
-                                    .buttonStyle(.borderedProminent)
-
-                                    Button {
-                                        viewModel.onTapUndoCount()
-                                    } label: {
-                                        Label("取り消し", systemImage: "arrow.uturn.backward.circle")
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .disabled(totalCount == 0)
-                                }
-                            }
+                            HabitPageCard(
+                                habit: habit,
+                                todayCount: viewModel.todayCount(for: habit.id),
+                                totalCount: viewModel.totalCount(for: habit.id),
+                                onTapCountUp: { viewModel.onTapCountUp() },
+                                onTapUndo: { viewModel.onTapUndoCount() }
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
                             .tag(index)
                         }
                     }
@@ -76,6 +54,23 @@ struct MainPagerView: View {
                         Image(systemName: "plus")
                     }
                     .accessibilityLabel(String(localized: "main_pager.button.add", defaultValue: "追加"))
+                }
+                ToolbarItemGroup(placement: .bottomBar) {
+                    Button {
+                        viewModel.onTapPreviousPage() // TODO: アニメーション追加
+                    } label: {
+                        Label("前へ", systemImage: "chevron.left")
+                    }
+                    .disabled(!viewModel.canMoveToPreviousPage)
+
+                    Spacer()
+
+                    Button {
+                        viewModel.onTapNextPage() // TODO: アニメーション追加
+                    } label: {
+                        Label("次へ", systemImage: "chevron.right")
+                    }
+                    .disabled(!viewModel.canMoveToNextPage)
                 }
             }
             .alert("エラー", isPresented: .constant(viewModel.errorMessage != nil)) {
@@ -111,6 +106,85 @@ struct MainPagerView: View {
         }
     }
 }
+
+private struct HabitPageCard: View {
+    let habit: Habit
+    let todayCount: Int
+    let totalCount: Int
+    let onTapCountUp: () -> Void
+    let onTapUndo: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack(spacing: 16) {
+                characterImage(for: habit, totalCount: totalCount)
+                    .aspectRatio(1, contentMode: .fit)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(habit.name ?? habit.kind.title)
+                        .font(.title2.bold())
+                    Text(habit.character.title)
+                        .foregroundStyle(.secondary)
+                    Text("種類: \(habit.kind.title)")
+                        .foregroundStyle(.secondary)
+
+                    Text("今日の記録: \(todayCount)\(habit.kind.unitTitle)")
+                        .font(.headline)
+                        .monospacedDigit()
+                    HStack(spacing: 12) {
+
+                        Button {
+                            onTapUndo()
+                        } label: {
+                            Label("取り消し", systemImage: "arrow.uturn.backward")
+                                .labelStyle(.iconOnly)
+                        }
+                        .tint(.red)
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .scaledToFill()
+                        .disabled(totalCount == 0)
+                        
+                        Button {
+                            onTapCountUp()
+                        } label: {
+                            Label("記録", systemImage: "plus")
+                                .labelStyle(.iconOnly)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .scaledToFill()
+                    }
+                }
+                .frame(alignment: .leading)
+            }
+
+            habitAnalytics(todayCount: todayCount, goalPerDay: habit.goalPerDay, unit: habit.kind.unitTitle)
+
+            Spacer(minLength: 0)
+        }
+    }
+    @ViewBuilder
+    private func habitAnalytics(todayCount: Int, goalPerDay: Int, unit: String) -> some View {
+        let remaining = max(goalPerDay - todayCount, 0)
+        VStack(alignment: .leading, spacing: 4) {
+            Text("進捗")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text("今日の上限: \(goalPerDay)\(unit)")
+                .foregroundStyle(.secondary)
+            Text("残り: \(remaining)\(unit)")
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(.rect(cornerRadius: 8))
+    }
+    // TODO: 棒グラフなどの視覚化を追加
+}
+
+
 
 private func characterImage(for habit: Habit, totalCount: Int) -> some View {
     let level = habitStateLevel(forTotalCount: totalCount)
