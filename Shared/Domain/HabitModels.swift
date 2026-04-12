@@ -26,6 +26,32 @@ enum HabitKind: String, CaseIterable, Sendable, Codable, QueryBindable {
     }
 }
 
+private enum HabitKindFeatureFlags {
+    static let nonGamblingEnabled = false
+    static let otherEnabled = false
+}
+
+extension HabitKind {
+    static var selectableKinds: [HabitKind] {
+        var kinds: [HabitKind] = [.nonSmoking, .nonAlcohol]
+        if HabitKindFeatureFlags.nonGamblingEnabled {
+            kinds.append(.nonGambling)
+        }
+        if HabitKindFeatureFlags.otherEnabled {
+            kinds.append(.other)
+        }
+        return kinds
+    }
+
+    static func selectableKinds(including current: HabitKind) -> [HabitKind] {
+        var kinds = selectableKinds
+        if !kinds.contains(current) {
+            kinds.insert(current, at: 0)
+        }
+        return kinds
+    }
+}
+
 enum CharacterType: String, CaseIterable, Sendable, Codable, QueryBindable {
     case hamster
     case fox
@@ -46,9 +72,9 @@ extension CharacterType {
     static func candidates(for kind: HabitKind) -> [CharacterType] {
         switch kind {
         case .nonSmoking:
-            return [.hamster, .fox]
+            return [.hamster]
         case .nonAlcohol:
-            return [.cat, .rabbit]
+            return [.hamster]
         case .nonGambling:
             return [.fox, .cat]
         case .other:
