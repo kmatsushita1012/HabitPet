@@ -129,7 +129,7 @@ private struct HabitPetWidgetView: View {
                 .frame(height: 72)
                 .clipShape(.rect(cornerRadius: 8))
 
-            HStack(spacing: 8) {
+            HStack(spacing: 0) {
                 if let habit = currentHabit {
                     VStack(alignment: .leading) {
                         Text(habit.name ?? habit.kind.title)
@@ -147,7 +147,7 @@ private struct HabitPetWidgetView: View {
                                 .foregroundStyle(WidgetTheme.primaryText)
                         }
                     }
-                    Spacer()
+                    Spacer(minLength: 0)
                     Button(intent: CountUpIntent(habitID: habit.id.uuidString)) {
                         Label("追加", systemImage: "plus")
                     }
