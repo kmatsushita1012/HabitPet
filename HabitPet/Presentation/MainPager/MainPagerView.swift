@@ -28,7 +28,7 @@ struct MainPagerView: View {
                                     totalCount: viewModel.totalCount(for: habit.id),
                                     todayCount: viewModel.todayCount(for: habit.id),
                                     goalTimelineStatus: viewModel.goalTimelineStatus(for: habit),
-                                    recentDailySeries: viewModel.recentDailyCounts(for: habit.id, days: 14),
+                                    recentDailySeries: viewModel.recentDailyCounts(for: habit, maxDays: 14),
                                     onTapCountUp: { viewModel.onTapCountUp() },
                                     onTapUndo: { viewModel.onTapUndoCount() }
                                 )
@@ -141,7 +141,11 @@ private struct HabitPageCard: View {
                 onTapCountUp: onTapCountUp,
                 onTapUndo: onTapUndo
             )
-            HabitHistoryChartCard(unit: habit.kind.unitTitle, series: recentDailySeries)
+            HabitHistoryChartCard(
+                unit: habit.kind.unitTitle,
+                goalPerDay: habit.goalPerDay,
+                series: recentDailySeries
+            )
         }
     }
 }
@@ -152,23 +156,24 @@ private struct HabitTopStatusRow: View {
     let timelineStatus: MainPagerViewModel.GoalTimelineStatus
 
     private let spacing: CGFloat = 12
+    private let rowHeight: CGFloat = 180
 
     var body: some View {
         GeometryReader { proxy in
             let totalWidth = max(proxy.size.width - spacing, 0)
             let imageWidth = totalWidth * (2.0 / 3.0)
             let statusWidth = totalWidth * (1.0 / 3.0)
-            let rowHeight = proxy.size.height
 
             HStack(alignment: .top, spacing: spacing) {
                 HabitCharacterImageView(habit: habit, totalCount: totalCount)
                     .frame(width: imageWidth, height: rowHeight)
+                    .clipped()
                 HabitOverallStatusCard(habit: habit, timelineStatus: timelineStatus)
                     .frame(width: statusWidth, height: rowHeight)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .frame(width: proxy.size.width, height: rowHeight, alignment: .leading)
         }
-        .aspectRatio(2.0, contentMode: .fit)
+        .frame(height: rowHeight)
     }
 }
 
@@ -178,10 +183,6 @@ private struct HabitOverallStatusCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(habit.name ?? habit.kind.title)
-                .font(.title2.bold())
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
             Text(habit.kind.title)
                 .foregroundStyle(.secondary)
 
@@ -272,10 +273,12 @@ private struct HabitTodayStatusCard: View {
 
 private struct HabitHistoryChartCard: View {
     let unit: String
+    let goalPerDay: Int
     let series: [MainPagerViewModel.DailyCountPoint]
 
     var body: some View {
-        let maxCount = max(series.map(\.count).max() ?? 0, 1)
+        let redLineBase = goalPerDay > 0 ? goalPerDay * 2 : 2
+        let maxCount = max(series.map(\.count).max() ?? 0, redLineBase)
 
         VStack(alignment: .leading, spacing: 10) {
             Text("過去14日")
@@ -286,7 +289,7 @@ private struct HabitHistoryChartCard: View {
                     x: .value("日付", point.date, unit: .day),
                     y: .value("記録", point.count)
                 )
-                .foregroundStyle(.green)
+                .foregroundStyle(barColor(for: point.count))
             }
             .chartYScale(domain: 0...maxCount)
             .frame(maxWidth: .infinity)
@@ -307,6 +310,17 @@ private struct HabitHistoryChartCard: View {
         )
         .clipShape(.rect(cornerRadius: 8))
     }
+
+    private func barColor(for count: Int) -> Color {
+        if goalPerDay <= 0 {
+            if count >= 2 { return .red }
+            if count == 1 { return .yellow }
+            return .green
+        }
+        if count > goalPerDay * 2 { return .red }
+        if count > goalPerDay { return .yellow }
+        return .green
+    }
 }
 
 private struct HabitCharacterImageView: View {
@@ -323,6 +337,7 @@ private struct HabitCharacterImageView: View {
                     .resizable()
                     .scaledToFill()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
             } else {
                 Image(systemName: "pawprint.fill")
                     .resizable()
@@ -331,8 +346,8 @@ private struct HabitCharacterImageView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(maxWidth: .infinity)
-        .aspectRatio(4.0 / 3.0, contentMode: .fit)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
         .background(MainPagerTheme.cardFill)
         .overlay(
             RoundedRectangle(cornerRadius: 8)

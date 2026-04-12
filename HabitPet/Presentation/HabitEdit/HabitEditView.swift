@@ -47,10 +47,16 @@ struct HabitEditView: View {
                     )
                 }
 
-                if viewModel.editingHabit != nil {
+                if viewModel.editingHabit != nil, FeatureFlags.habitLifecycleActionsEnabled {
                     Section {
-                        Button(L10n.archiveButton, role: .destructive) {
-                            viewModel.isArchiveAlertPresented = true
+                        HStack {
+                            Button(L10n.archiveButton, role: .destructive) {
+                                viewModel.isArchiveAlertPresented = true
+                            }
+                            Spacer()
+                            Button(L10n.deleteButton, role: .destructive) {
+                                viewModel.isDeleteAlertPresented = true
+                            }
                         }
                     }
                 }
@@ -82,6 +88,14 @@ struct HabitEditView: View {
                 Button(L10n.cancelButton, role: .cancel) {}
             } message: {
                 Text(L10n.archiveAlertMessage)
+            }
+            .alert(L10n.deleteAlertTitle, isPresented: $viewModel.isDeleteAlertPresented) {
+                Button(L10n.deleteButton, role: .destructive) {
+                    viewModel.onTapDelete()
+                }
+                Button(L10n.cancelButton, role: .cancel) {}
+            } message: {
+                Text(L10n.deleteAlertMessage)
             }
             .alert(L10n.errorTitle, isPresented: .constant(viewModel.errorMessage != nil)) {
                 Button(L10n.okButton) {
@@ -178,7 +192,6 @@ private struct HabitGoalSection: View {
                 selection: Binding(get: { goalDeadline }, set: onChangeGoalDeadline),
                 displayedComponents: [.date]
             )
-            .environment(\.locale, .current)
 
             LabeledContent("\(L10n.goalPerDayTitle)（\(selectedKind.unitTitle)）") {
                 TextField(
@@ -227,7 +240,7 @@ private struct CharacterPreviewImageView: View {
             if let image = AppCharacterImageLoader.load(named: names) {
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFit()
+                    .scaledToFill()
             } else {
                 Image(systemName: "pawprint.fill")
                     .resizable()
@@ -237,6 +250,7 @@ private struct CharacterPreviewImageView: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 96)
+        .clipped()
     }
 }
 
@@ -265,15 +279,23 @@ private enum L10n {
     static let yesterdaySimplePlaceholder = String(localized: "habit_edit.field.yesterday_simple", defaultValue: "入力")
     static let yesterdayFooter = String(localized: "habit_edit.field.yesterday_footer", defaultValue: "保存時に「昨日」のイベントとして登録されます。")
     static let archiveButton = String(localized: "habit_edit.button.archive", defaultValue: "アーカイブ")
+    static let deleteButton = String(localized: "habit_edit.button.delete", defaultValue: "削除")
     static let newHabitTitle = String(localized: "habit_edit.title.new", defaultValue: "習慣を追加")
     static let editHabitTitle = String(localized: "habit_edit.title.edit", defaultValue: "習慣を編集")
     static let closeButton = String(localized: "common.button.close", defaultValue: "閉じる")
     static let saveButton = String(localized: "common.button.save", defaultValue: "保存")
     static let archiveAlertTitle = String(localized: "habit_edit.archive.alert.title", defaultValue: "習慣をアーカイブしますか？")
     static let archiveAlertMessage = String(localized: "habit_edit.archive.alert.message", defaultValue: "この習慣はメイン画面から非表示になります。")
+    static let deleteAlertTitle = String(localized: "habit_edit.delete.alert.title", defaultValue: "習慣を削除しますか？")
+    static let deleteAlertMessage = String(localized: "habit_edit.delete.alert.message", defaultValue: "この操作は元に戻せません。")
     static let cancelButton = String(localized: "common.button.cancel", defaultValue: "キャンセル")
     static let errorTitle = String(localized: "common.error.title", defaultValue: "エラー")
     static let okButton = String(localized: "common.button.ok", defaultValue: "OK")
+}
+
+private enum FeatureFlags {
+    // アーカイブ一覧画面を追加するまで非表示にしておく
+    static let habitLifecycleActionsEnabled = false
 }
 
 #Preview {

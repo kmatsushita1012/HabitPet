@@ -154,22 +154,44 @@ final class MainPagerViewModel {
             }
     }
 
-    func recentDailyCounts(for habitID: Habit.ID, days: Int) -> [DailyCountPoint] {
-        guard days > 0 else { return [] }
+    func recentDailyCounts(for habit: Habit, maxDays: Int) -> [DailyCountPoint] {
+        guard maxDays > 0 else { return [] }
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        guard let startDate = calendar.date(byAdding: .day, value: -(days - 1), to: today) else {
+        let habitID = habit.id
+        let filteredEvents = activeEvents.filter { $0.habitID == habitID && $0.revokedAt == nil }
+        let eventDays = filteredEvents.map { calendar.startOfDay(for: $0.occurredAt) }
+
+        let createdDay = calendar.startOfDay(for: habit.createdAt)
+        let goalDay = Self.goalDeadlineFormatter.date(from: habit.goalDeadline)
+            .map { calendar.startOfDay(for: $0) } ?? createdDay
+        let eventFirstDay = eventDays.min() ?? createdDay
+        let eventLastDay = eventDays.max() ?? goalDay
+
+        let domainMin = min(createdDay, eventFirstDay)
+        let domainMax = max(goalDay, eventLastDay)
+        let totalDomainDays = max((calendar.dateComponents([.day], from: domainMin, to: domainMax).day ?? 0) + 1, 1)
+
+        let selectedRangeDays = min(maxDays, totalDomainDays)
+        let latestAnchor = min(today, domainMax)
+        guard let tentativeStart = calendar.date(byAdding: .day, value: -(selectedRangeDays - 1), to: latestAnchor) else {
             return []
         }
+        let startDate = max(domainMin, tentativeStart)
+        guard let endDate = calendar.date(byAdding: .day, value: selectedRangeDays - 1, to: startDate) else {
+            return []
+        }
+        let clampedEndDate = min(domainMax, endDate)
+        let pointCount = max((calendar.dateComponents([.day], from: startDate, to: clampedEndDate).day ?? 0) + 1, 1)
 
         var dailyMap: [Date: Int] = [:]
-        for event in activeEvents where event.habitID == habitID && event.revokedAt == nil {
+        for event in filteredEvents {
             let day = calendar.startOfDay(for: event.occurredAt)
-            guard day >= startDate && day <= today else { continue }
+            guard day >= startDate && day <= clampedEndDate else { continue }
             dailyMap[day, default: 0] += event.delta
         }
 
-        return (0..<days).compactMap { offset in
+        return (0..<pointCount).compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: offset, to: startDate) else { return nil }
             return DailyCountPoint(date: date, count: dailyMap[date, default: 0])
         }

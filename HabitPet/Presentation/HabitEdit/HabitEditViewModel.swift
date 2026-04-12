@@ -15,6 +15,7 @@ final class HabitEditViewModel {
     var goalPerDayInput: String
     var yesterdayCountInput: String
     var isArchiveAlertPresented = false
+    var isDeleteAlertPresented = false
     var errorMessage: String?
     var shouldDismiss = false
 
@@ -138,6 +139,19 @@ final class HabitEditViewModel {
         Task {
             do {
                 try habitUseCase.archiveHabit(editingHabit, now: Date())
+                WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
+                shouldDismiss = true
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func onTapDelete() {
+        guard let editingHabit else { return }
+        Task {
+            do {
+                try habitUseCase.deleteHabit(editingHabit)
                 WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
                 shouldDismiss = true
             } catch {

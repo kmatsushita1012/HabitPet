@@ -14,6 +14,7 @@ protocol HabitUseCaseProtocol: Sendable {
     func createHabit(_ draft: HabitDraft, yesterdayCount: Int, now: Date) throws -> Habit
     func updateHabit(_ habit: Habit, now: Date) throws
     func archiveHabit(_ habit: Habit, now: Date) throws
+    func deleteHabit(_ habit: Habit) throws
     func recordDelta(habitID: Habit.ID, delta: Int, source: HabitEventSource, now: Date) throws
     func undoDelta(habitID: Habit.ID, count: Int, now: Date) throws
 }
@@ -65,6 +66,10 @@ struct HabitUseCase: HabitUseCaseProtocol, Sendable {
         archived.isArchived = true
         archived.updatedAt = now
         try habitDataStore.update(archived)
+    }
+
+    func deleteHabit(_ habit: Habit) throws {
+        try habitDataStore.delete(id: habit.id)
     }
 
     func recordDelta(habitID: Habit.ID, delta: Int, source: HabitEventSource, now: Date = Date()) throws {

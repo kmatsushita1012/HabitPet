@@ -6,20 +6,85 @@ import WidgetKit
 
 private struct HabitCounterEntry: TimelineEntry {
     let date: Date
+    let selectedHabitID: String?
 }
 
-private struct HabitCounterProvider: TimelineProvider {
+struct HabitWidgetConfigurationIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource = "表示する習慣"
+    static var description = IntentDescription("ウィジェットで表示する習慣を選択します。")
+
+    @Parameter(title: "習慣")
+    var habit: HabitEntity?
+}
+
+struct HabitEntity: AppEntity, Identifiable {
+    typealias ID = String
+
+    let id: String
+    let title: String
+
+    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "習慣")
+    static var defaultQuery = HabitEntityQuery()
+
+    var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(title: "\(title)")
+    }
+}
+
+struct HabitEntityQuery: EntityQuery {
+    func entities(for identifiers: [HabitEntity.ID]) async throws -> [HabitEntity] {
+        let habits = fetchActiveHabits()
+        let map = Dictionary(uniqueKeysWithValues: habits.map { ($0.id.uuidString, $0) })
+        return identifiers.compactMap { id in
+            guard let habit = map[id] else { return nil }
+            return HabitEntity(id: id, title: habit.name ?? habit.kind.title)
+        }
+    }
+
+    func suggestedEntities() async throws -> [HabitEntity] {
+        fetchActiveHabits().map { habit in
+            HabitEntity(
+                id: habit.id.uuidString,
+                title: habit.name ?? habit.kind.title
+            )
+        }
+    }
+
+    private func fetchActiveHabits() -> [Habit] {
+        do {
+            let database = try appDatabase()
+            return try database.read { db in
+                try Habit
+                    .where { $0.isArchived.eq(false) }
+                    .order { $0.sortOrder.asc() }
+                    .fetchAll(db)
+            }
+        } catch {
+            return []
+        }
+    }
+}
+
+private struct HabitCounterProvider: AppIntentTimelineProvider {
+    typealias Intent = HabitWidgetConfigurationIntent
+
     func placeholder(in context: Context) -> HabitCounterEntry {
-        HabitCounterEntry(date: .now)
+        HabitCounterEntry(date: .now, selectedHabitID: nil)
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (HabitCounterEntry) -> Void) {
-        completion(HabitCounterEntry(date: .now))
+    func snapshot(for configuration: HabitWidgetConfigurationIntent, in context: Context) async -> HabitCounterEntry {
+        HabitCounterEntry(
+            date: .now,
+            selectedHabitID: configuration.habit?.id
+        )
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<HabitCounterEntry>) -> Void) {
-        let entry = HabitCounterEntry(date: .now)
-        completion(Timeline(entries: [entry], policy: .after(.now.addingTimeInterval(15 * 60))))
+    func timeline(for configuration: HabitWidgetConfigurationIntent, in context: Context) async -> Timeline<HabitCounterEntry> {
+        let entry = HabitCounterEntry(
+            date: .now,
+            selectedHabitID: configuration.habit?.id
+        )
+        return Timeline(entries: [entry], policy: .after(.now.addingTimeInterval(15 * 60)))
     }
 }
 
@@ -27,12 +92,12 @@ struct HabitPetWidget: Widget {
     private let kind = "HabitPetWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: HabitCounterProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: HabitWidgetConfigurationIntent.self, provider: HabitCounterProvider()) { entry in
             HabitPetWidgetView(entry: entry)
         }
         .configurationDisplayName("HabitPet カウンター")
         .description("今日のカウントをホーム画面から記録できます。")
-        .supportedFamilies([.systemSmall])
+        .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
 
@@ -51,43 +116,50 @@ private struct HabitPetWidgetView: View {
     )
     private var activeEvents
     
-    @FetchOne
-    private var currentCount: Int = 0
-    
     init(entry: HabitCounterEntry) {
         self.entry = entry
-        if let currentHabit {
-            // MARK: 修正しないこと
-            _currentCount = FetchOne(wrappedValue: 0, HabitEvent.where{ $0.habitID.eq(currentHabit.id).and($0.revokedAt.is(nil)) }.select{ $0.delta.total() })
-        }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                characterImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 72)
-                Spacer()
-            }
-            Spacer(minLength: 0)
+            characterImage
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .frame(height: 72)
+                .clipShape(.rect(cornerRadius: 8))
 
-            HStack(spacing: 6) {
-                Text("\(currentCount)\(currentHabit?.kind.unitTitle ?? "回")")
-                    .font(.callout.bold())
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .foregroundStyle(WidgetTheme.primaryText)
-                Spacer(minLength: 4)
-                if let habitID = currentHabit?.id.uuidString {
-                    Button(intent: CountUpIntent(habitID: habitID)) {
+            HStack(spacing: 8) {
+                if let habit = currentHabit {
+                    VStack(alignment: .leading) {
+                        Text(habit.name ?? habit.kind.title)
+                            .font(.callout.bold())
+                            .lineLimit(1)
+                        HStack {
+                            Text("今日")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("\(currentCount)\(habit.kind.unitTitle)")
+                                .font(.callout.bold())
+                                .monospacedDigit()
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .foregroundStyle(WidgetTheme.primaryText)
+                        }
+                    }
+                    Spacer()
+                    Button(intent: CountUpIntent(habitID: habit.id.uuidString)) {
                         Label("追加", systemImage: "plus")
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderedProminent)
                     .tint(.green)
+                } else {
+                    Text("新しい習慣を作りましょう")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .padding(.horizontal, 8)
@@ -95,9 +167,8 @@ private struct HabitPetWidgetView: View {
             .background(WidgetTheme.panelFill)
             .clipShape(.rect(cornerRadius: 8))
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
         .containerBackground(WidgetTheme.background, for: .widget)
+        // MARK: Widgetの余白は元から広いためpaddingはつけない
     }
 
     private var characterImage: Image {
@@ -113,11 +184,25 @@ private struct HabitPetWidgetView: View {
     }
 
     private var currentHabit: Habit? {
-        habits.first
+        if let selectedHabitID = entry.selectedHabitID,
+           let selectedUUID = UUID(uuidString: selectedHabitID),
+           let selected = habits.first(where: { $0.id == selectedUUID }) {
+            return selected
+        }
+        return habits.first
     }
     
     private var stateLevel: Int {
         habitStateLevel(forTotalCount: currentCount)
+    }
+
+    private var currentCount: Int {
+        guard let habitID = currentHabit?.id else { return 0 }
+        return activeEvents
+            .filter { $0.habitID == habitID && $0.revokedAt == nil }
+            .reduce(into: 0) { partialResult, event in
+                partialResult += event.delta
+            }
     }
 }
 
@@ -200,6 +285,10 @@ struct CountUpIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         guard let parsedHabitID = UUID(uuidString: habitID) else {
             return .result()
+        }
+
+        prepareDependencies {
+            $0.defaultDatabase = try! appDatabase()
         }
 
         let useCase = HabitUseCase()
