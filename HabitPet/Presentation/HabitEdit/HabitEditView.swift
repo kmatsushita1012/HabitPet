@@ -126,7 +126,7 @@ private struct HabitKindSection: View {
                 L10n.kindTitle,
                 selection: Binding(get: { selectedKind }, set: onChangeKind)
             ) {
-                ForEach(HabitKind.allCases, id: \.self) { kind in
+                ForEach(HabitKind.selectableKinds(including: selectedKind), id: \.self) { kind in
                     Text(kind.title).tag(kind)
                 }
             }
@@ -236,21 +236,36 @@ private struct CharacterPreviewImageView: View {
 
     var body: some View {
         let names = habitCharacterAssetNames(kind: kind, character: character, level: 1)
-        Group {
-            if let image = AppCharacterImageLoader.load(named: names) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Image(systemName: "pawprint.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundStyle(.secondary)
+        let previewWidth: CGFloat = 128
+        let previewHeight: CGFloat = 96
+
+        HStack {
+            Spacer(minLength: 0)
+            ZStack {
+                if let image = AppCharacterImageLoader.load(named: names) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: "pawprint.fill")
+                        .resizable()
+                        .scaledToFill()
+                        .foregroundStyle(.secondary)
+                }
             }
+            .frame(width: previewWidth, height: previewHeight)
+            .background(
+                Color(uiColor: .secondarySystemBackground),
+                in: .rect(cornerRadius: 8, style: .continuous)
+            )
+            .clipShape(.rect(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+            )
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 96)
-        .clipped()
     }
 }
 

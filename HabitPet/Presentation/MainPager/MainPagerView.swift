@@ -167,7 +167,11 @@ private struct HabitTopStatusRow: View {
             HStack(alignment: .top, spacing: spacing) {
                 HabitCharacterImageView(habit: habit, totalCount: totalCount)
                     .frame(width: imageWidth, height: rowHeight)
-                    .clipped()
+                    .clipShape(.rect(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(MainPagerTheme.cardStroke, lineWidth: 1)
+                    )
                 HabitOverallStatusCard(habit: habit, timelineStatus: timelineStatus)
                     .frame(width: statusWidth, height: rowHeight)
             }
@@ -331,7 +335,7 @@ private struct HabitCharacterImageView: View {
         let level = habitStateLevel(forTotalCount: totalCount)
         let names = habitCharacterAssetNames(kind: habit.kind, character: habit.character, level: level)
 
-        Group {
+        ZStack {
             if let image = AppCharacterImageLoader.load(named: names) {
                 Image(uiImage: image)
                     .resizable()
@@ -347,13 +351,7 @@ private struct HabitCharacterImageView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipped()
         .background(MainPagerTheme.cardFill)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(MainPagerTheme.cardStroke, lineWidth: 1)
-        )
-        .clipShape(.rect(cornerRadius: 8))
     }
 }
 
