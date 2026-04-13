@@ -7,6 +7,7 @@ protocol HabitDataStoreProtocol: Sendable {
     func update(_ habit: Habit) throws
     func delete(id: Habit.ID) throws
     func upsert(_ habit: Habit) throws
+    func deleteAll() throws
 }
 
 struct HabitDataStore: HabitDataStoreProtocol, Sendable {
@@ -35,6 +36,13 @@ struct HabitDataStore: HabitDataStoreProtocol, Sendable {
         @Dependency(\.defaultDatabase) var database
         try database.write { db in
             try Habit.upsert { habit }.execute(db)
+        }
+    }
+
+    func deleteAll() throws {
+        @Dependency(\.defaultDatabase) var database
+        try database.write { db in
+            try Habit.delete().execute(db)
         }
     }
 }

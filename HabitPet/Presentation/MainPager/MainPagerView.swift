@@ -62,6 +62,21 @@ struct MainPagerView: View {
                     }
                     .accessibilityLabel(String(localized: "main_pager.button.add", defaultValue: "追加"))
                 }
+                #if DEBUG
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button("App Store提出用サンプルデータを注入") {
+                            viewModel.onTapInjectDebugSampleData()
+                        }
+                        Button("DBを空にリセット", role: .destructive) {
+                            viewModel.onTapResetDatabase()
+                        }
+                    } label: {
+                        Image(systemName: "ladybug")
+                    }
+                    .accessibilityLabel("デバッグメニュー")
+                }
+                #endif
                 ToolbarItemGroup(placement: .bottomBar) {
                     Button {
                         withAnimation(.snappy) {

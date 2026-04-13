@@ -135,6 +135,34 @@ final class MainPagerViewModel {
         }
     }
 
+    #if DEBUG
+    func onTapInjectDebugSampleData() {
+        Task {
+            do {
+                try habitUseCase.injectAppStoreScreenshotSampleData(now: Date())
+                selectedPageIndex = 0
+                try await loadEntities()
+                WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func onTapResetDatabase() {
+        Task {
+            do {
+                try habitUseCase.resetAllData()
+                selectedPageIndex = 0
+                try await loadEntities()
+                WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+    #endif
+
     // Utilities
     var selectedHabitTotalCount: Int {
         guard let habitID = selectedHabit?.id else { return 0 }

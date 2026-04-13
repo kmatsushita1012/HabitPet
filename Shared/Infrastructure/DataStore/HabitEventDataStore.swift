@@ -7,6 +7,7 @@ protocol HabitEventDataStoreProtocol: Sendable {
     func update(_ event: HabitEvent) throws
     func delete(id: HabitEvent.ID) throws
     func revokeLast(habitID: Habit.ID, count: Int, now: Date) throws
+    func deleteAll() throws
 }
 
 struct HabitEventDataStore: HabitEventDataStoreProtocol, Sendable {
@@ -47,6 +48,13 @@ struct HabitEventDataStore: HabitEventDataStoreProtocol, Sendable {
                 event.revokedAt = now
                 try HabitEvent.upsert { event }.execute(db)
             }
+        }
+    }
+
+    func deleteAll() throws {
+        @Dependency(\.defaultDatabase) var database
+        try database.write { db in
+            try HabitEvent.delete().execute(db)
         }
     }
 }

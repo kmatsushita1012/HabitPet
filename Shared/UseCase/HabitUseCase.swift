@@ -17,6 +17,8 @@ protocol HabitUseCaseProtocol: Sendable {
     func deleteHabit(_ habit: Habit) throws
     func recordDelta(habitID: Habit.ID, delta: Int, source: HabitEventSource, now: Date) throws
     func undoDelta(habitID: Habit.ID, count: Int, now: Date) throws
+    func resetAllData() throws
+    func injectAppStoreScreenshotSampleData(now: Date) throws
 }
 
 struct HabitUseCase: HabitUseCaseProtocol, Sendable {
@@ -89,6 +91,118 @@ struct HabitUseCase: HabitUseCaseProtocol, Sendable {
         try habitEventDataStore.revokeLast(habitID: habitID, count: count, now: now)
     }
 
+    func resetAllData() throws {
+        try habitEventDataStore.deleteAll()
+        try habitDataStore.deleteAll()
+    }
+
+    func injectAppStoreScreenshotSampleData(now: Date = Date()) throws {
+        try resetAllData()
+
+        let calendar = Calendar.current
+        let smokingCreatedAt = calendar.date(byAdding: .day, value: -42, to: now) ?? now
+        let alcoholCreatedAt = calendar.date(byAdding: .day, value: -35, to: now) ?? now
+
+        let smokingHabit = Habit(
+            id: Habit.ID(),
+            kind: .nonSmoking,
+            character: .hamster,
+            name: "綺麗な肺にするぞ！",
+            goalDeadline: Self.goalDeadlineString(daysFromNow: 45, now: now),
+            goalPerDay: 3,
+            isArchived: false,
+            sortOrder: 0,
+            createdAt: smokingCreatedAt,
+            updatedAt: now
+        )
+        let alcoholHabit = Habit(
+            id: Habit.ID(),
+            kind: .nonAlcohol,
+            character: .rabbit,
+            name: "朝スッキリ起きる！",
+            goalDeadline: Self.goalDeadlineString(daysFromNow: 30, now: now),
+            goalPerDay: 1,
+            isArchived: false,
+            sortOrder: 1,
+            createdAt: alcoholCreatedAt,
+            updatedAt: now
+        )
+
+        try habitDataStore.create(smokingHabit)
+        try habitDataStore.create(alcoholHabit)
+
+        let smokingSeries = Self.makeImprovementSeries(totalDays: 14, start: 6, end: 0)
+        let alcoholSeries = Self.makeImprovementSeries(totalDays: 14, start: 3, end: 0)
+
+        try createDailyEvents(
+            habitID: smokingHabit.id,
+            dailyCounts: smokingSeries,
+            now: now
+        )
+        try createDailyEvents(
+            habitID: alcoholHabit.id,
+            dailyCounts: alcoholSeries,
+            now: now
+        )
+    }
+
+    private func createDailyEvents(habitID: Habit.ID, dailyCounts: [Int], now: Date) throws {
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: now)
+        let count = dailyCounts.count
+
+        for (index, dailyCount) in dailyCounts.enumerated() where dailyCount > 0 {
+            let daysFromToday = -(count - 1 - index)
+            guard
+                let day = calendar.date(byAdding: .day, value: daysFromToday, to: startOfToday),
+                let occurredAt = calendar.date(byAdding: .hour, value: 12, to: day)
+            else {
+                continue
+            }
+
+            let event = HabitEvent(
+                id: HabitEvent.ID(),
+                habitID: habitID,
+                delta: dailyCount,
+                source: .app,
+                occurredAt: occurredAt,
+                revokedAt: nil,
+                createdAt: occurredAt
+            )
+            try habitEventDataStore.create(event)
+        }
+    }
+
+    private static func goalDeadlineString(daysFromNow: Int, now: Date) -> String {
+        let calendar = Calendar(identifier: .gregorian)
+        let date = calendar.date(byAdding: .day, value: daysFromNow, to: now) ?? now
+        return goalDeadlineFormatter.string(from: date)
+    }
+
+    private static func makeImprovementSeries(totalDays: Int, start: Int, end: Int) -> [Int] {
+        guard totalDays > 0 else { return [] }
+        guard totalDays > 1 else { return [max(start, 0)] }
+
+        let clampedStart = max(start, 0)
+        let clampedEnd = max(end, 0)
+        let delta = Double(clampedEnd - clampedStart)
+        let denominator = Double(totalDays - 1)
+
+        return (0..<totalDays).map { index in
+            let progress = Double(index) / denominator
+            let value = Double(clampedStart) + (delta * progress)
+            return max(Int(round(value)), 0)
+        }
+    }
+
+    private static let goalDeadlineFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 }
 
 private enum HabitUseCaseKey: DependencyKey {
