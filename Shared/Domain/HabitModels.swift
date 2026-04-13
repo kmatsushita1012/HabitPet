@@ -72,9 +72,9 @@ extension CharacterType {
     static func candidates(for kind: HabitKind) -> [CharacterType] {
         switch kind {
         case .nonSmoking:
-            return [.hamster]
+            return [.hamster, .rabbit]
         case .nonAlcohol:
-            return [.hamster]
+            return [.hamster, .rabbit]
         case .nonGambling:
             return [.fox, .cat]
         case .other:
