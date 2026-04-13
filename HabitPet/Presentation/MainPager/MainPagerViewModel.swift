@@ -26,6 +26,9 @@ final class MainPagerViewModel {
     var editingHabit: Habit?
     var errorMessage: String?
 
+    @ObservationIgnored
+    private var pendingSelectionHabitID: Habit.ID?
+
     // Entity State
     @ObservationIgnored
     @FetchAll(
@@ -51,6 +54,16 @@ final class MainPagerViewModel {
 
     func onAppDidBecomeActive() {
         reloadData()
+    }
+
+    func onOpenURL(_ url: URL) {
+        guard url.scheme == "habitpet" else { return }
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
+        let habitID = components.queryItems?
+            .first(where: { $0.name == "id" || $0.name == "habitID" })?
+            .value
+        guard let habitID, let parsedHabitID = UUID(uuidString: habitID) else { return }
+        selectPage(for: parsedHabitID)
     }
 
     func onPageChanged(_ index: Int) {
@@ -247,6 +260,21 @@ final class MainPagerViewModel {
     private func loadEntities() async throws {
         try await $habits.load()
         try await $activeEvents.load()
+        applyPendingSelectionIfNeeded()
+    }
+
+    private func selectPage(for habitID: Habit.ID) {
+        if let index = habits.firstIndex(where: { $0.id == habitID }) {
+            selectedPageIndex = index
+            pendingSelectionHabitID = nil
+        } else {
+            pendingSelectionHabitID = habitID
+        }
+    }
+
+    private func applyPendingSelectionIfNeeded() {
+        guard let pendingSelectionHabitID else { return }
+        selectPage(for: pendingSelectionHabitID)
     }
 
     private static let goalDeadlineFormatter: DateFormatter = {

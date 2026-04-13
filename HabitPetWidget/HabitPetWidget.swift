@@ -168,7 +168,13 @@ private struct HabitPetWidgetView: View {
             .clipShape(.rect(cornerRadius: 8))
         }
         .containerBackground(WidgetTheme.background, for: .widget)
+        .widgetURL(openAppURL)
         // MARK: Widgetの余白は元から広いためpaddingはつけない
+    }
+
+    private var openAppURL: URL? {
+        guard let habitID = currentHabit?.id.uuidString else { return URL(string: "habitpet://main") }
+        return URL(string: "habitpet://habit?id=\(habitID)")
     }
 
     private var characterImage: Image {

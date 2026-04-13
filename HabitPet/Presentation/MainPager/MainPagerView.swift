@@ -99,6 +99,9 @@ struct MainPagerView: View {
             guard newPhase == .active else { return }
             viewModel.onAppDidBecomeActive()
         }
+        .onOpenURL { url in
+            viewModel.onOpenURL(url)
+        }
         .sheet(
             isPresented: $viewModel.isCreatePresented,
             onDismiss: { viewModel.onDismissCreate() }
