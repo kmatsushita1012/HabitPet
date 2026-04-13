@@ -132,7 +132,7 @@ private struct HabitPetWidgetView: View {
             HStack(spacing: 0) {
                 if let habit = currentHabit {
                     VStack(alignment: .leading) {
-                        Text(habit.name ?? habit.kind.title)
+                        Text(habit.kind.title)
                             .font(.callout.bold())
                             .lineLimit(1)
                         HStack {
