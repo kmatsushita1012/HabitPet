@@ -287,9 +287,10 @@
 				};
 			};
 			buildConfigurationList = 293719442F82B3E7009D8D07 /* Build configuration list for PBXProject "HabitPet" */;
-			developmentRegion = en;
+			developmentRegion = ja;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				ja,
 				en,
 				Base,
 			);
