@@ -199,7 +199,8 @@ private struct HabitPetWidgetView: View {
     }
     
     private var stateLevel: Int {
-        habitStateLevel(forTotalCount: currentCount)
+        guard let habit = currentHabit else { return 1 }
+        return habitStateLevel(goalPerDay: habit.goalPerDay, recentDailyCounts: recentSevenDaysCounts)
     }
 
     private var currentCount: Int {
@@ -209,6 +210,26 @@ private struct HabitPetWidgetView: View {
             .reduce(into: 0) { partialResult, event in
                 partialResult += event.delta
             }
+    }
+
+    private var recentSevenDaysCounts: [Int] {
+        guard let habitID = currentHabit?.id else { return Array(repeating: 0, count: 7) }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let filteredEvents = activeEvents.filter { $0.habitID == habitID && $0.revokedAt == nil }
+        var dailyMap: [Date: Int] = [:]
+
+        for event in filteredEvents {
+            let day = calendar.startOfDay(for: event.occurredAt)
+            guard day <= today else { continue }
+            dailyMap[day, default: 0] += event.delta
+        }
+
+        return (0..<7).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { return nil }
+            return max(dailyMap[date, default: 0], 0)
+        }
     }
 }
 

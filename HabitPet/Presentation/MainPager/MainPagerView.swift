@@ -25,7 +25,6 @@ struct MainPagerView: View {
                             ForEach(Array(viewModel.habits.enumerated()), id: \.element.id) { index, habit in
                                 HabitPageCard(
                                     habit: habit,
-                                    totalCount: viewModel.totalCount(for: habit.id),
                                     todayCount: viewModel.todayCount(for: habit.id),
                                     goalTimelineStatus: viewModel.goalTimelineStatus(for: habit),
                                     recentDailySeries: viewModel.recentDailyCounts(for: habit, maxDays: 14),
@@ -138,7 +137,6 @@ struct MainPagerView: View {
 
 private struct HabitPageCard: View {
     let habit: Habit
-    let totalCount: Int
     let todayCount: Int
     let goalTimelineStatus: MainPagerViewModel.GoalTimelineStatus
     let recentDailySeries: [MainPagerViewModel.DailyCountPoint]
@@ -149,7 +147,7 @@ private struct HabitPageCard: View {
         VStack(spacing: 12) {
             HabitTopStatusRow(
                 habit: habit,
-                totalCount: totalCount,
+                recentDailySeries: recentDailySeries,
                 timelineStatus: goalTimelineStatus
             )
             HabitTodayStatusCard(
@@ -170,7 +168,7 @@ private struct HabitPageCard: View {
 
 private struct HabitTopStatusRow: View {
     let habit: Habit
-    let totalCount: Int
+    let recentDailySeries: [MainPagerViewModel.DailyCountPoint]
     let timelineStatus: MainPagerViewModel.GoalTimelineStatus
 
     private let spacing: CGFloat = 12
@@ -183,7 +181,7 @@ private struct HabitTopStatusRow: View {
             let statusWidth = totalWidth * (1.0 / 3.0)
 
             HStack(alignment: .top, spacing: spacing) {
-                HabitCharacterImageView(habit: habit, totalCount: totalCount)
+                HabitCharacterImageView(habit: habit, recentDailySeries: recentDailySeries)
                     .frame(width: imageWidth, height: rowHeight)
                     .clipShape(.rect(cornerRadius: 8, style: .continuous))
                     .overlay(
@@ -347,10 +345,10 @@ private struct HabitHistoryChartCard: View {
 
 private struct HabitCharacterImageView: View {
     let habit: Habit
-    let totalCount: Int
+    let recentDailySeries: [MainPagerViewModel.DailyCountPoint]
 
     var body: some View {
-        let level = habitStateLevel(forTotalCount: totalCount)
+        let level = habitStateLevel(goalPerDay: habit.goalPerDay, recentDailyCounts: recentSevenDaysCounts)
         let names = habitCharacterAssetNames(kind: habit.kind, character: habit.character, level: level)
 
         ZStack {
@@ -370,6 +368,23 @@ private struct HabitCharacterImageView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(MainPagerTheme.cardFill)
+    }
+
+    private var recentSevenDaysCounts: [Int] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        var dailyMap: [Date: Int] = [:]
+
+        for point in recentDailySeries {
+            let day = calendar.startOfDay(for: point.date)
+            guard day <= today else { continue }
+            dailyMap[day] = point.count
+        }
+
+        return (0..<7).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { return nil }
+            return dailyMap[date, default: 0]
+        }
     }
 }
 

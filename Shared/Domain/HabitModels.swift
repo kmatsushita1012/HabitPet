@@ -118,19 +118,47 @@ struct HabitEvent: Sendable, Identifiable {
     var createdAt: Date
 }
 
-func habitStateLevel(forTotalCount totalCount: Int) -> Int {
-    switch totalCount {
-    case ..<5:
-        return 1
-    case ..<10:
-        return 2
-    case ..<20:
+private let habitWeeklyWeights: [Double] = [1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2]
+
+func habitDayScore(count: Int, goalPerDay: Int) -> Double {
+    let safeCount = max(count, 0)
+
+    if goalPerDay > 0 {
+        if safeCount <= goalPerDay { return 0 }
+        if safeCount < goalPerDay * 2 { return 2 }
         return 3
-    case ..<30:
-        return 4
-    default:
-        return 5
     }
+
+    switch safeCount {
+    case 0:
+        return 0
+    case 1:
+        return 1.5
+    case 2:
+        return 2.5
+    default:
+        return 3
+    }
+}
+
+func habitWeeklyScore(goalPerDay: Int, recentDailyCounts: [Int]) -> Double {
+    let weightedSum = habitWeeklyWeights.enumerated().reduce(into: 0.0) { partial, pair in
+        let offset = pair.offset
+        let weight = pair.element
+        let count = offset < recentDailyCounts.count ? recentDailyCounts[offset] : 0
+        partial += habitDayScore(count: count, goalPerDay: goalPerDay) * weight
+    }
+
+    return weightedSum / 3.8
+}
+
+func habitStateLevel(goalPerDay: Int, recentDailyCounts: [Int]) -> Int {
+    let weeklyScore = habitWeeklyScore(goalPerDay: goalPerDay, recentDailyCounts: recentDailyCounts)
+    if weeklyScore == 0 { return 1 }
+    if weeklyScore <= 0.70 { return 2 }
+    if weeklyScore <= 1.40 { return 3 }
+    if weeklyScore <= 2.10 { return 4 }
+    return 5
 }
 
 func habitCharacterAssetNames(kind: HabitKind, character: CharacterType, level: Int) -> [String] {
