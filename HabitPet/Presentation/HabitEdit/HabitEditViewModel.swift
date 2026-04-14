@@ -6,6 +6,13 @@ import WidgetKit
 @MainActor
 @Observable
 final class HabitEditViewModel {
+    enum CompletionResult: Equatable {
+        case created
+        case updated
+        case archived
+        case deleted
+    }
+
     // UI State
     var editingHabit: Habit?
     var selectedKind: HabitKind
@@ -18,6 +25,7 @@ final class HabitEditViewModel {
     var isDeleteAlertPresented = false
     var errorMessage: String?
     var shouldDismiss = false
+    var completionResult: CompletionResult?
 
     @ObservationIgnored
     @Dependency(\.habitUseCase) private var habitUseCase
@@ -109,6 +117,7 @@ final class HabitEditViewModel {
                     habit.goalDeadline = goalDeadlineString
                     habit.goalPerDay = goalPerDay
                     try habitUseCase.updateHabit(habit, now: Date())
+                    completionResult = .updated
                 } else {
                     let draft = HabitDraft(
                         kind: selectedKind,
@@ -124,6 +133,7 @@ final class HabitEditViewModel {
                         yesterdayCount: yesterdayCount,
                         now: Date()
                     )
+                    completionResult = .created
                 }
 
                 WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
@@ -140,6 +150,7 @@ final class HabitEditViewModel {
             do {
                 try habitUseCase.archiveHabit(editingHabit, now: Date())
                 WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
+                completionResult = .archived
                 shouldDismiss = true
             } catch {
                 errorMessage = error.localizedDescription
@@ -153,6 +164,7 @@ final class HabitEditViewModel {
             do {
                 try habitUseCase.deleteHabit(editingHabit)
                 WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
+                completionResult = .deleted
                 shouldDismiss = true
             } catch {
                 errorMessage = error.localizedDescription

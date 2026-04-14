@@ -4,9 +4,14 @@ import UIKit
 struct HabitEditView: View {
     @State private var viewModel: HabitEditViewModel
     @Environment(\.dismiss) private var dismiss
+    private let onComplete: ((HabitEditViewModel.CompletionResult) -> Void)?
 
-    init(viewModel: HabitEditViewModel) {
+    init(
+        viewModel: HabitEditViewModel,
+        onComplete: ((HabitEditViewModel.CompletionResult) -> Void)? = nil
+    ) {
         _viewModel = State(initialValue: viewModel)
+        self.onComplete = onComplete
     }
 
     var body: some View {
@@ -47,16 +52,16 @@ struct HabitEditView: View {
                     )
                 }
 
-                if viewModel.editingHabit != nil, FeatureFlags.habitLifecycleActionsEnabled {
+                if viewModel.editingHabit != nil {
                     Section {
-                        HStack {
+                        if FeatureFlags.habitLifecycleActionsEnabled {
                             Button(L10n.archiveButton, role: .destructive) {
                                 viewModel.isArchiveAlertPresented = true
                             }
-                            Spacer()
-                            Button(L10n.deleteButton, role: .destructive) {
-                                viewModel.isDeleteAlertPresented = true
-                            }
+                        }
+
+                        Button(L10n.deleteButton, role: .destructive) {
+                            viewModel.isDeleteAlertPresented = true
                         }
                     }
                 }
@@ -110,6 +115,9 @@ struct HabitEditView: View {
         }
         .onChange(of: viewModel.shouldDismiss) { _, shouldDismiss in
             if shouldDismiss {
+                if let completionResult = viewModel.completionResult {
+                    onComplete?(completionResult)
+                }
                 dismiss()
             }
         }

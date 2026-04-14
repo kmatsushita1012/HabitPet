@@ -4,6 +4,13 @@ import UIKit
 
 struct MainPagerView: View {
     @State private var viewModel = MainPagerViewModel()
+    @AppStorage("hasSeenInitialOnboarding") private var hasSeenInitialOnboarding = false
+    @AppStorage("hasShownWidgetOnboarding") private var hasShownWidgetOnboarding = false
+    @State private var isInitialOnboardingPresented = false
+    @State private var shouldPresentCreateAfterInitialOnboarding = false
+    @State private var shouldPresentWidgetOnboardingAfterCreate = false
+    @State private var shouldPresentWidgetOnboardingOnNextAppear = false
+    @State private var isWidgetOnboardingPresented = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -108,19 +115,35 @@ struct MainPagerView: View {
         }
         .onAppear {
             viewModel.onAppear()
+            presentInitialOnboardingIfNeeded()
+            presentWidgetOnboardingIfNeeded()
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
             viewModel.onAppDidBecomeActive()
+            presentWidgetOnboardingIfNeeded()
+        }
+        .onChange(of: viewModel.habits.count) { _, _ in
+            presentInitialOnboardingIfNeeded()
+            presentWidgetOnboardingIfNeeded()
         }
         .onOpenURL { url in
             viewModel.onOpenURL(url)
         }
         .sheet(
             isPresented: $viewModel.isCreatePresented,
-            onDismiss: { viewModel.onDismissCreate() }
+            onDismiss: {
+                viewModel.onDismissCreate()
+                if shouldPresentWidgetOnboardingAfterCreate {
+                    shouldPresentWidgetOnboardingAfterCreate = false
+                    isWidgetOnboardingPresented = true
+                }
+            }
         ) {
-            HabitEditView(viewModel: HabitEditViewModel(habit: nil))
+            HabitEditView(viewModel: HabitEditViewModel(habit: nil)) { completionResult in
+                guard completionResult == .created, !hasShownWidgetOnboarding else { return }
+                shouldPresentWidgetOnboardingAfterCreate = true
+            }
         }
         .sheet(
             isPresented: $viewModel.isEditPresented,
@@ -132,6 +155,58 @@ struct MainPagerView: View {
                 ContentUnavailableView("編集対象が見つかりません", systemImage: "exclamationmark.circle")
             }
         }
+        .sheet(isPresented: $isWidgetOnboardingPresented) {
+            WidgetOnboardingView(
+                onDismissForLater: {
+                    shouldPresentWidgetOnboardingOnNextAppear = true
+                    isWidgetOnboardingPresented = false
+                },
+                onClose: {
+                    hasShownWidgetOnboarding = true
+                    shouldPresentWidgetOnboardingOnNextAppear = false
+                    isWidgetOnboardingPresented = false
+                }
+            )
+        }
+        .onChange(of: isWidgetOnboardingPresented) { _, isPresented in
+            guard !isPresented else { return }
+            if shouldPresentWidgetOnboardingAfterCreate {
+                shouldPresentWidgetOnboardingAfterCreate = false
+            }
+        }
+        .fullScreenCover(isPresented: $isInitialOnboardingPresented) {
+            InitialOnboardingView {
+                hasSeenInitialOnboarding = true
+                shouldPresentCreateAfterInitialOnboarding = true
+                isInitialOnboardingPresented = false
+            }
+        }
+        .onChange(of: isInitialOnboardingPresented) { _, isPresented in
+            guard !isPresented, shouldPresentCreateAfterInitialOnboarding else { return }
+            shouldPresentCreateAfterInitialOnboarding = false
+            viewModel.onTapAddPage()
+        }
+    }
+
+    private func presentWidgetOnboardingIfNeeded() {
+        guard !hasShownWidgetOnboarding else { return }
+        guard !viewModel.habits.isEmpty else { return }
+        guard !viewModel.isCreatePresented else { return }
+        guard !viewModel.isEditPresented else { return }
+        guard !isInitialOnboardingPresented else { return }
+        guard !isWidgetOnboardingPresented else { return }
+        guard shouldPresentWidgetOnboardingOnNextAppear else { return }
+        shouldPresentWidgetOnboardingOnNextAppear = false
+        isWidgetOnboardingPresented = true
+    }
+
+    private func presentInitialOnboardingIfNeeded() {
+        guard viewModel.habits.isEmpty else { return }
+        guard !hasSeenInitialOnboarding else { return }
+        guard !viewModel.isCreatePresented else { return }
+        guard !isWidgetOnboardingPresented else { return }
+        guard !isInitialOnboardingPresented else { return }
+        isInitialOnboardingPresented = true
     }
 }
 
