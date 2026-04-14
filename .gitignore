@@ -1,0 +1,9 @@
+build/
+
+.DS_Store
+
+HabitPet.xcodeproj/xcuserdata/
+
+images/screenshots/.aso_state.json
+images/screenshots/**/_derived/
+images/screenshots/**/scaffold.png
