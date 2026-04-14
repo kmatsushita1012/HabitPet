@@ -102,6 +102,8 @@ struct HabitPetWidget: Widget {
 }
 
 private struct HabitPetWidgetView: View {
+    @Environment(\.widgetFamily) private var family
+
     let entry: HabitCounterEntry
 
     @FetchAll(
@@ -121,55 +123,164 @@ private struct HabitPetWidgetView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            characterImage
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity)
-                .frame(height: 72)
-                .clipShape(.rect(cornerRadius: 8))
-
-            HStack(spacing: 0) {
-                if let habit = currentHabit {
-                    VStack(alignment: .leading) {
-                        Text(habit.kind.title)
-                            .font(.callout.bold())
-                            .lineLimit(1)
-                        HStack {
-                            Text("今日")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("\(currentCount)\(habit.kind.unitTitle)")
-                                .font(.callout.bold())
-                                .monospacedDigit()
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                                .foregroundStyle(WidgetTheme.primaryText)
-                        }
-                    }
-                    Spacer(minLength: 0)
-                    Button(intent: CountUpIntent(habitID: habit.id.uuidString)) {
-                        Label("追加", systemImage: "plus")
-                    }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.green)
-                } else {
-                    Text("新しい習慣を作りましょう")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+        Group {
+            if family == .systemMedium {
+                mediumLayout
+            } else {
+                smallLayout
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(WidgetTheme.panelFill)
-            .clipShape(.rect(cornerRadius: 8))
         }
         .containerBackground(WidgetTheme.background, for: .widget)
         .widgetURL(openAppURL)
         // MARK: Widgetの余白は元から広いためpaddingはつけない
+    }
+
+    private var smallLayout: some View {
+        GeometryReader { proxy in
+            let imageHeight = min(proxy.size.width * (3.0 / 4.0), proxy.size.height * 0.62)
+            let imageWidth = imageHeight * (4.0 / 3.0)
+
+            VStack(alignment: .center, spacing: 4) {
+                widgetCharacterImage
+                    .frame(width: imageWidth, height: imageHeight)
+                    .frame(maxWidth: .infinity, alignment: .center)
+
+                HStack(spacing: 0) {
+                    if let habit = currentHabit {
+                        VStack(alignment: .leading) {
+                            Text(habit.kind.title)
+                                .font(.callout.bold())
+                                .lineLimit(1)
+                            HStack {
+                                Text("今日")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text("\(currentCount)\(habit.kind.unitTitle)")
+                                    .font(.callout.bold())
+                                    .monospacedDigit()
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                    .foregroundStyle(WidgetTheme.primaryText)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                        Button(intent: CountUpIntent(habitID: habit.id.uuidString)) {
+                            Label("追加", systemImage: "plus")
+                        }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.green)
+                    } else {
+                        Text("新しい習慣を作りましょう")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(WidgetTheme.panelFill)
+                .clipShape(.rect(cornerRadius: 8))
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+        }
+    }
+
+    private var mediumLayout: some View {
+        GeometryReader { proxy in
+            let totalWidth = max(proxy.size.width - 10, 0)
+            let imageHeight = proxy.size.height
+            let imageWidth = min(imageHeight * (4.0 / 3.0), totalWidth * 0.5)
+
+            HStack(spacing: 10) {
+                widgetCharacterImage
+                    .frame(width: imageWidth, height: imageHeight)
+
+                if let habit = currentHabit {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let habitName = habit.name, !habitName.isEmpty {
+                            Text(habitName)
+                                .font(.subheadline.bold())
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer()
+                        
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(habit.kind.title)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                
+                                HStack(spacing: 6) {
+                                    Text("今日")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    
+                                    Text("\(currentCount)\(habit.kind.unitTitle)")
+                                        .font(.callout.bold())
+                                        .monospacedDigit()
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
+                                        .foregroundStyle(WidgetTheme.primaryText)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                            
+                            Button(intent: CountUpIntent(habitID: habit.id.uuidString)) {
+                                Label("追加", systemImage: "plus")
+                            }
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(.borderedProminent)
+                            .tint(.green)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(WidgetTheme.panelFill)
+                    .clipShape(.rect(cornerRadius: 8))
+                } else {
+                        Text("新しい習慣を作りましょう")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(WidgetTheme.panelFill)
+                            .clipShape(.rect(cornerRadius: 8))
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+        }
+    }
+
+    private var widgetCharacterImage: some View {
+        GeometryReader { proxy in
+            ZStack {
+                if isPlaceholderCharacterImage {
+                    characterImage
+                        .resizable()
+                        .scaledToFit()
+                        .padding(12)
+                        .foregroundStyle(.secondary)
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                } else {
+                    characterImage
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .background(WidgetTheme.panelFill)
+            .clipShape(.rect(cornerRadius: 8))
+            .clipped()
+        }
     }
 
     private var openAppURL: URL? {
@@ -178,15 +289,22 @@ private struct HabitPetWidgetView: View {
     }
 
     private var characterImage: Image {
-        guard let habit = currentHabit else {
+        guard let uiImage = characterUIImage else {
             return Image(systemName: "pawprint.fill")
+        }
+        return Image(uiImage: uiImage)
+    }
+
+    private var characterUIImage: UIImage? {
+        guard let habit = currentHabit else {
+            return nil
         }
         let names = habitCharacterAssetNames(kind: habit.kind, character: habit.character, level: stateLevel)
-        if let uiImage = WidgetCharacterImageLoader.load(named: names) {
-            return Image(uiImage: uiImage)
-        } else {
-            return Image(systemName: "pawprint.fill")
-        }
+        return WidgetCharacterImageLoader.load(named: names)
+    }
+
+    private var isPlaceholderCharacterImage: Bool {
+        characterUIImage == nil
     }
 
     private var currentHabit: Habit? {
@@ -205,8 +323,13 @@ private struct HabitPetWidgetView: View {
 
     private var currentCount: Int {
         guard let habitID = currentHabit?.id else { return 0 }
+        let calendar = Calendar.current
         return activeEvents
-            .filter { $0.habitID == habitID && $0.revokedAt == nil }
+            .filter {
+                $0.habitID == habitID &&
+                $0.revokedAt == nil &&
+                calendar.isDateInToday($0.occurredAt)
+            }
             .reduce(into: 0) { partialResult, event in
                 partialResult += event.delta
             }
@@ -273,10 +396,12 @@ private enum WidgetTheme {
 }
 
 private enum WidgetCharacterImageLoader {
+    private static let maxWidgetImageArea: CGFloat = 422_840
+
     static func load(named names: [String]) -> UIImage? {
         for name in names {
             if let image = UIImage(named: name, in: .main, compatibleWith: nil) {
-                return image
+                return downsampleIfNeeded(image)
             }
         }
 
@@ -286,11 +411,32 @@ private enum WidgetCharacterImageLoader {
         if let appBundle = Bundle(url: appBundleURL) {
             for name in names {
                 if let image = UIImage(named: name, in: appBundle, compatibleWith: nil) {
-                    return image
+                    return downsampleIfNeeded(image)
                 }
             }
         }
         return nil
+    }
+
+    private static func downsampleIfNeeded(_ image: UIImage) -> UIImage {
+        guard let cgImage = image.cgImage else { return image }
+
+        let width = CGFloat(cgImage.width)
+        let height = CGFloat(cgImage.height)
+        let area = width * height
+        guard area > maxWidgetImageArea else { return image }
+
+        let ratio = sqrt(maxWidgetImageArea / area)
+        let targetSize = CGSize(
+            width: max(1, floor(width * ratio)),
+            height: max(1, floor(height * ratio))
+        )
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: targetSize, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
     }
 }
 
@@ -312,10 +458,6 @@ struct CountUpIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         guard let parsedHabitID = UUID(uuidString: habitID) else {
             return .result()
-        }
-
-        prepareDependencies {
-            $0.defaultDatabase = try! appDatabase()
         }
 
         let useCase = HabitUseCase()

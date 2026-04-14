@@ -172,13 +172,13 @@ private struct HabitTopStatusRow: View {
     let timelineStatus: MainPagerViewModel.GoalTimelineStatus
 
     private let spacing: CGFloat = 12
-    private let rowHeight: CGFloat = 180
 
     var body: some View {
         GeometryReader { proxy in
             let totalWidth = max(proxy.size.width - spacing, 0)
             let imageWidth = totalWidth * (2.0 / 3.0)
             let statusWidth = totalWidth * (1.0 / 3.0)
+            let rowHeight = imageWidth * (3.0 / 4.0)
 
             HStack(alignment: .top, spacing: spacing) {
                 HabitCharacterImageView(habit: habit, recentDailySeries: recentDailySeries)
@@ -193,7 +193,7 @@ private struct HabitTopStatusRow: View {
             }
             .frame(width: proxy.size.width, height: rowHeight, alignment: .leading)
         }
-        .frame(height: rowHeight)
+        .aspectRatio(2.0, contentMode: .fit)
     }
 }
 
