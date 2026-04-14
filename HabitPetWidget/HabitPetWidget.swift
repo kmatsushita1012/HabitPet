@@ -95,7 +95,7 @@ struct HabitPetWidget: Widget {
         AppIntentConfiguration(kind: kind, intent: HabitWidgetConfigurationIntent.self, provider: HabitCounterProvider()) { entry in
             HabitPetWidgetView(entry: entry)
         }
-        .configurationDisplayName("HabitPet カウンター")
+        .configurationDisplayName("もふデトックス カウンター")
         .description("今日のカウントをホーム画面から記録できます。")
         .supportedFamilies([.systemSmall, .systemMedium])
     }

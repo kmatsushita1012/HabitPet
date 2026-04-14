@@ -178,7 +178,7 @@ final class MainPagerViewModel {
     }
 
     var currentHabitTitle: String {
-        guard let habit = selectedHabit else { return "HabitPet" }
+        guard let habit = selectedHabit else { return "もふデトックス" }
         return habit.name ?? habit.kind.title
     }
 
