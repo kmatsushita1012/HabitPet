@@ -28,6 +28,7 @@ struct HabitEditView: View {
                     selectedKind: viewModel.selectedKind,
                     selectedCharacter: viewModel.selectedCharacter,
                     selectableCharacters: viewModel.selectableCharacters,
+                    isCharacterUnlocked: { viewModel.entitlements.canUse($0) },
                     onChangeCharacter: { viewModel.onChangeCharacter($0) }
                 )
 
@@ -109,29 +110,14 @@ struct HabitEditView: View {
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
-            .confirmationDialog(
-                L10n.purchaseDialogTitle,
-                isPresented: $viewModel.isPurchaseDialogPresented,
-                titleVisibility: .visible
-            ) {
-                if viewModel.selectedCharacterRequiresPurchase {
-                    Button(L10n.purchaseSelectedCharacterButton(viewModel.selectedCharacter.title)) {
-                        viewModel.onTapPurchaseSelectedCharacter()
-                    }
+            .sheet(isPresented: $viewModel.isPurchaseSheetPresented) {
+                PurchasePaywallSheetView(selectedCharacter: viewModel.selectedCharacter) {
+                    viewModel.onPurchaseCompletedFromSheet()
                 }
-                Button(L10n.purchaseAllAccessButton) {
-                    viewModel.onTapPurchaseAllAccess()
-                }
-                Button(L10n.restorePurchasesButton) {
-                    viewModel.onTapRestorePurchases()
-                }
-                Button(L10n.cancelButton, role: .cancel) {}
-            } message: {
-                Text(L10n.purchaseDialogMessage(viewModel.selectedCharacter.title))
             }
         }
         .onAppear {
-            viewModel.onAppearForCreate()
+            viewModel.onAppear()
         }
         .onChange(of: viewModel.shouldDismiss) { _, shouldDismiss in
             if shouldDismiss {
@@ -167,7 +153,16 @@ private struct HabitCharacterSection: View {
     let selectedKind: HabitKind
     let selectedCharacter: CharacterType
     let selectableCharacters: [CharacterType]
+    let isCharacterUnlocked: (CharacterType) -> Bool
     let onChangeCharacter: (CharacterType) -> Void
+
+    private var availableCharacters: [CharacterType] {
+        selectableCharacters.filter { isCharacterUnlocked($0) }
+    }
+
+    private var purchaseRequiredCharacters: [CharacterType] {
+        selectableCharacters.filter { !isCharacterUnlocked($0) }
+    }
 
     var body: some View {
         Section(L10n.characterSection) {
@@ -184,18 +179,32 @@ private struct HabitCharacterSection: View {
                     }
                 )
             ) {
-                ForEach(selectableCharacters, id: \.rawValue) { character in
-                    Text(characterLabel(character)).tag(character.rawValue)
+                if !availableCharacters.isEmpty {
+                    Section(L10n.characterAvailableSectionTitle) {
+                        ForEach(availableCharacters, id: \.rawValue) { character in
+                            Text(characterLabel(character)).tag(character.rawValue)
+                        }
+                    }
+                }
+
+                if !availableCharacters.isEmpty && !purchaseRequiredCharacters.isEmpty {
+                    Divider()
+                }
+
+                if !purchaseRequiredCharacters.isEmpty {
+                    Section(L10n.characterPurchaseRequiredSectionTitle) {
+                        ForEach(purchaseRequiredCharacters, id: \.rawValue) { character in
+                            Text(characterLabel(character)).tag(character.rawValue)
+                        }
+                    }
                 }
             }
+            .pickerStyle(.menu)
         }
     }
 
     private func characterLabel(_ character: CharacterType) -> String {
-        if character.isDefaultFree {
-            return character.title
-        }
-        return "\(character.title) \(L10n.purchaseLockedSuffix)"
+        character.title
     }
 }
 
@@ -319,6 +328,8 @@ private enum L10n {
     static let kindSection = String(localized: "habit_edit.section.kind", defaultValue: "種類")
     static let kindTitle = String(localized: "habit_edit.field.kind", defaultValue: "種類")
     static let characterSection = String(localized: "habit_edit.section.character", defaultValue: "キャラクター")
+    static let characterAvailableSectionTitle = String(localized: "habit_edit.section.character.available", defaultValue: "利用可能")
+    static let characterPurchaseRequiredSectionTitle = String(localized: "habit_edit.section.character.purchase_required", defaultValue: "購入が必要")
     static let nameSection = String(localized: "habit_edit.section.name", defaultValue: "習慣名（任意）")
     static let namePlaceholder = String(localized: "habit_edit.field.name", defaultValue: "タイトル（例: 夜の1本をやめる）")
     static let goalSection = String(localized: "habit_edit.section.goal", defaultValue: "目標")
@@ -341,24 +352,6 @@ private enum L10n {
     static let cancelButton = String(localized: "common.button.cancel", defaultValue: "キャンセル")
     static let errorTitle = String(localized: "common.error.title", defaultValue: "エラー")
     static let okButton = String(localized: "common.button.ok", defaultValue: "OK")
-    static let purchaseDialogTitle = String(localized: "habit_edit.purchase.dialog.title", defaultValue: "キャラクター解放")
-    static let purchaseAllAccessButton = String(localized: "habit_edit.purchase.button.all_access", defaultValue: "全キャラ解放を購入（500円）")
-    static let restorePurchasesButton = String(localized: "habit_edit.purchase.button.restore", defaultValue: "購入を復元")
-    static let purchaseLockedSuffix = String(localized: "habit_edit.purchase.locked_suffix", defaultValue: "（未解放）")
-
-    static func purchaseSelectedCharacterButton(_ characterTitle: String) -> String {
-        String(
-            localized: "habit_edit.purchase.button.selected",
-            defaultValue: "\(characterTitle)を解放（200円）"
-        )
-    }
-
-    static func purchaseDialogMessage(_ characterTitle: String) -> String {
-        String(
-            localized: "habit_edit.purchase.dialog.message",
-            defaultValue: "\(characterTitle)を保存するには解放が必要です。"
-        )
-    }
 }
 
 private enum FeatureFlags {

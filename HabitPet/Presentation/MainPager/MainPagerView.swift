@@ -52,14 +52,6 @@ struct MainPagerView: View {
             }
             .navigationTitle(viewModel.currentHabitTitle)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        viewModel.onTapEdit()
-                    } label: {
-                        Image(systemName: "square.and.pencil")
-                    }
-                    .accessibilityLabel(String(localized: "main_pager.button.edit", defaultValue: "編集"))
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         viewModel.onTapAddPage()
@@ -68,21 +60,38 @@ struct MainPagerView: View {
                     }
                     .accessibilityLabel(String(localized: "main_pager.button.add", defaultValue: "追加"))
                 }
-                #if DEBUG
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        Button {
+                            viewModel.onTapEdit()
+                        } label: {
+                            Label(
+                                String(localized: "main_pager.button.edit", defaultValue: "編集"),
+                                systemImage: "square.and.pencil"
+                            )
+                        }
+                        Button {
+                            viewModel.onTapPurchaseManagement()
+                        } label: {
+                            Label(
+                                String(localized: "main_pager.button.purchase_management", defaultValue: "購入管理"),
+                                systemImage: "creditcard"
+                            )
+                        }
+                        #if DEBUG
+                        Divider()
                         Button("App Store提出用サンプルデータを注入") {
                             viewModel.onTapInjectDebugSampleData()
                         }
                         Button("DBを空にリセット", role: .destructive) {
                             viewModel.onTapResetDatabase()
                         }
+                        #endif
                     } label: {
-                        Image(systemName: "ladybug")
+                        Image(systemName: "ellipsis.circle")
                     }
-                    .accessibilityLabel("デバッグメニュー")
+                    .accessibilityLabel(String(localized: "main_pager.button.more", defaultValue: "その他"))
                 }
-                #endif
                 ToolbarItemGroup(placement: .bottomBar) {
                     Button {
                         withAnimation(.snappy) {
@@ -154,6 +163,12 @@ struct MainPagerView: View {
             } else {
                 ContentUnavailableView("編集対象が見つかりません", systemImage: "exclamationmark.circle")
             }
+        }
+        .sheet(
+            isPresented: $viewModel.isPurchaseManagementPresented,
+            onDismiss: { viewModel.onDismissPurchaseManagement() }
+        ) {
+            PurchaseManagementView()
         }
         .sheet(isPresented: $isWidgetOnboardingPresented) {
             WidgetOnboardingView(
@@ -389,12 +404,6 @@ private struct HabitHistoryChartCard: View {
             .chartYScale(domain: 0...maxCount)
             .frame(maxWidth: .infinity)
             .aspectRatio(16.0 / 9.0, contentMode: .fit)
-
-            if let latest = series.last {
-                Text("直近: \(latest.count)\(unit)")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)

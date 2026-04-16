@@ -23,11 +23,11 @@ final class HabitEditViewModel {
     var yesterdayCountInput: String
     var isArchiveAlertPresented = false
     var isDeleteAlertPresented = false
-    var isPurchaseDialogPresented = false
-    var isPurchaseProcessing = false
+    var isPurchaseSheetPresented = false
     var errorMessage: String?
     var shouldDismiss = false
     var completionResult: CompletionResult?
+    var entitlements = CharacterEntitlementState(allAccessPurchased: false, purchasedCharacterIDs: [])
 
     @ObservationIgnored
     @Dependency(\.habitUseCase) private var habitUseCase
@@ -68,6 +68,11 @@ final class HabitEditViewModel {
     }
 
     // Action methods
+    func onAppear() {
+        refreshEntitlements()
+        onAppearForCreate()
+    }
+
     func onAppearForCreate() {
         guard editingHabit == nil else { return }
         selectedKind = .nonSmoking
@@ -115,10 +120,11 @@ final class HabitEditViewModel {
                 }
 
                 let entitlements = await characterPurchaseClient.refreshEntitlements()
+                self.entitlements = entitlements
                 if entitlements.canUse(selectedCharacter) {
                     try saveHabit()
                 } else {
-                    isPurchaseDialogPresented = true
+                    isPurchaseSheetPresented = true
                 }
             } catch {
                 errorMessage = error.localizedDescription
@@ -126,49 +132,19 @@ final class HabitEditViewModel {
         }
     }
 
-    func onTapPurchaseSelectedCharacter() {
-        guard !isPurchaseProcessing else { return }
-        isPurchaseProcessing = true
-
+    func onPurchaseCompletedFromSheet() {
         Task {
-            defer { isPurchaseProcessing = false }
             do {
-                let result = try await characterPurchaseClient.purchaseSingleUnlock(for: selectedCharacter)
-                try handlePurchaseResult(result)
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-        }
-    }
-
-    func onTapPurchaseAllAccess() {
-        guard !isPurchaseProcessing else { return }
-        isPurchaseProcessing = true
-
-        Task {
-            defer { isPurchaseProcessing = false }
-            do {
-                let result = try await characterPurchaseClient.purchaseAllAccess()
-                try handlePurchaseResult(result)
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-        }
-    }
-
-    func onTapRestorePurchases() {
-        guard !isPurchaseProcessing else { return }
-        isPurchaseProcessing = true
-
-        Task {
-            defer { isPurchaseProcessing = false }
-            do {
-                let entitlements = try await characterPurchaseClient.restore()
+                let entitlements = await characterPurchaseClient.refreshEntitlements()
+                self.entitlements = entitlements
                 if entitlements.canUse(selectedCharacter) {
-                    isPurchaseDialogPresented = false
+                    isPurchaseSheetPresented = false
                     try saveHabit()
                 } else {
-                    errorMessage = L10n.restoreNotPurchasedMessage
+                    errorMessage = String(
+                        localized: "habit_edit.purchase.restore.not_found",
+                        defaultValue: "復元可能な購入が見つかりませんでした。"
+                    )
                 }
             } catch {
                 errorMessage = error.localizedDescription
@@ -209,19 +185,12 @@ final class HabitEditViewModel {
         CharacterType.selectableForHabitEdit(kind: selectedKind)
     }
 
-    var selectedCharacterRequiresPurchase: Bool {
-        selectedCharacter.isPurchasable && !selectedCharacter.isDefaultFree
-    }
-
-    private func handlePurchaseResult(_ result: CharacterPurchaseResult) throws {
-        switch result {
-        case .success:
-            isPurchaseDialogPresented = false
-            try saveHabit()
-        case .pending:
-            errorMessage = L10n.purchasePendingMessage
-        case .cancelled:
-            break
+    func refreshEntitlements() {
+        Task {
+            let cached = await characterPurchaseClient.entitlements()
+            entitlements = cached
+            let latest = await characterPurchaseClient.refreshEntitlements()
+            entitlements = latest
         }
     }
 
@@ -269,15 +238,4 @@ final class HabitEditViewModel {
         guard let raw else { return nil }
         return formatter.date(from: raw)
     }
-}
-
-private enum L10n {
-    static let purchasePendingMessage = String(
-        localized: "habit_edit.purchase.pending",
-        defaultValue: "購入処理は保留中です。承認後に再度保存してください。"
-    )
-    static let restoreNotPurchasedMessage = String(
-        localized: "habit_edit.purchase.restore.not_found",
-        defaultValue: "復元可能な購入が見つかりませんでした。"
-    )
 }

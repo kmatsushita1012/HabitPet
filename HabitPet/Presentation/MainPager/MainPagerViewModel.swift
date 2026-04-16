@@ -23,6 +23,7 @@ final class MainPagerViewModel {
     var selectedPageIndex: Int = 0
     var isEditPresented = false
     var isCreatePresented = false
+    var isPurchaseManagementPresented = false
     var editingHabit: Habit?
     var errorMessage: String?
 
@@ -82,6 +83,10 @@ final class MainPagerViewModel {
         isCreatePresented = true
     }
 
+    func onTapPurchaseManagement() {
+        isPurchaseManagementPresented = true
+    }
+
     func onTapPreviousPage() {
         guard canMoveToPreviousPage else { return }
         selectedPageIndex -= 1
@@ -99,6 +104,10 @@ final class MainPagerViewModel {
 
     func onDismissCreate() {
         isCreatePresented = false
+    }
+
+    func onDismissPurchaseManagement() {
+        isPurchaseManagementPresented = false
     }
 
     func onTapCountUp() {
