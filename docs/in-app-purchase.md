@@ -219,3 +219,143 @@
 4. 復元導線
 5. テスト追加（Unit → Integration → UI）
 6. 審査チェック項目の最終確認
+
+---
+
+## ASC設定詳細設計（実装準拠）
+
+この章は、現在の実装コードに合わせた App Store Connect 設定の確定値。
+
+- 対象アプリ Bundle ID: `com.studiomk.HabitPet`
+- 単体解放チケット Product ID: `habitpet.character.unlock.ticket`
+- 全解放 Product ID: `habitpet.characters.all_access`
+
+### 1. IAP商品定義（必須）
+
+#### A. 単体解放チケット
+
+- Type: `CONSUMABLE`
+- Product ID: `habitpet.character.unlock.ticket`
+- Reference Name: `Character Unlock Ticket`
+- 価格: 200円相当のティア
+- 用途: 購入直後に「現在選択中キャラ」を1体解放
+- 注意: キャラごとに Product ID は作らない（この1商品のみ）
+
+#### B. 全キャラ解放
+
+- Type: `NON_CONSUMABLE`
+- Product ID: `habitpet.characters.all_access`
+- Reference Name: `All Characters Access`
+- 価格: 500円相当のティア
+- 用途: すべての課金対象キャラを永続解放
+
+### 2. ローカライズ定義（ja-JP / en-US）
+
+#### A. `habitpet.character.unlock.ticket`
+
+- `ja-JP` 表示名: `キャラ解放チケット`
+- `ja-JP` 説明: `選択中のキャラクターを1体解放します。`
+- `en-US` 表示名: `Character Unlock Ticket`
+- `en-US` 説明: `Unlocks one selected character immediately.`
+
+#### B. `habitpet.characters.all_access`
+
+- `ja-JP` 表示名: `全キャラ解放`
+- `ja-JP` 説明: `すべてのキャラクターを永続的に解放します。`
+- `en-US` 表示名: `All Characters Access`
+- `en-US` 説明: `Permanently unlocks all characters.`
+
+### 3. 価格・提供地域
+
+- Base Territory: `Japan`
+- 単体解放チケット: 200円相当の価格ティア
+- 全キャラ解放: 500円相当の価格ティア
+- Availability: アプリ提供地域と揃える（基本は全地域）
+- 運用ルール:
+- 先に `pricing summary` と `availability` を readback してから submit
+- 価格改定時は両商品を同一リリース単位で更新
+
+### 4. 審査提出に必要なASC設定
+
+- 各 IAP を `Ready to Submit` まで入力
+- 各 IAP に審査用スクリーンショットを登録
+- アプリ審査提出時に IAP を紐付けて同時提出
+- App Review Notes に課金導線を明記
+- 導線: `キャラ選択 → 保存タップ → 購入ダイアログ`
+- 復元導線: `購入ダイアログ内「購入を復元」`
+
+### 5. App Review Notes テンプレート（提出時に使用）
+
+- 本アプリの課金は2種類です:
+- `habitpet.character.unlock.ticket`（Consumable）: 購入直後に選択中キャラ1体を解放
+- `habitpet.characters.all_access`（Non-Consumable）: すべての課金対象キャラを永続解放
+- 購入導線は「キャラ選択後、保存時」に表示されます。
+- 復元は購入ダイアログ内の「購入を復元」から実行できます。
+- 無料キャラ（初期2体）は購入不要です。
+
+### 6. ASC CLI運用コマンド（再現用）
+
+前提:
+
+- `APP_ID` は ASC上のアプリID（数値）を使う
+
+```bash
+asc auth status
+asc apps view --id "$APP_ID" --output json --pretty
+asc iap list --app "$APP_ID" --output json --pretty
+```
+
+単体解放チケット（Consumable）作成:
+
+```bash
+asc iap setup \
+  --app "$APP_ID" \
+  --type CONSUMABLE \
+  --reference-name "Character Unlock Ticket" \
+  --product-id "habitpet.character.unlock.ticket" \
+  --locale "ja-JP" \
+  --display-name "キャラ解放チケット" \
+  --description "選択中のキャラクターを1体解放します。" \
+  --price "200" \
+  --base-territory "Japan"
+```
+
+全キャラ解放（Non-Consumable）作成:
+
+```bash
+asc iap setup \
+  --app "$APP_ID" \
+  --type NON_CONSUMABLE \
+  --reference-name "All Characters Access" \
+  --product-id "habitpet.characters.all_access" \
+  --locale "ja-JP" \
+  --display-name "全キャラ解放" \
+  --description "すべてのキャラクターを永続的に解放します。" \
+  --price "500" \
+  --base-territory "Japan"
+```
+
+英語ローカライズ追加:
+
+```bash
+asc iap localizations create \
+  --iap-id "$IAP_ID" \
+  --locale "en-US" \
+  --name "Character Unlock Ticket" \
+  --description "Unlocks one selected character immediately."
+```
+
+```bash
+asc iap localizations create \
+  --iap-id "$IAP_ID" \
+  --locale "en-US" \
+  --name "All Characters Access" \
+  --description "Permanently unlocks all characters."
+```
+
+最終確認と提出:
+
+```bash
+asc iap pricing summary --app "$APP_ID" --output json --pretty
+asc iap submit --iap-id "$IAP_ID" --confirm
+```
