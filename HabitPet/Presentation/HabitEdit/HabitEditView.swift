@@ -109,6 +109,26 @@ struct HabitEditView: View {
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
+            .confirmationDialog(
+                L10n.purchaseDialogTitle,
+                isPresented: $viewModel.isPurchaseDialogPresented,
+                titleVisibility: .visible
+            ) {
+                if viewModel.selectedCharacterRequiresPurchase {
+                    Button(L10n.purchaseSelectedCharacterButton(viewModel.selectedCharacter.title)) {
+                        viewModel.onTapPurchaseSelectedCharacter()
+                    }
+                }
+                Button(L10n.purchaseAllAccessButton) {
+                    viewModel.onTapPurchaseAllAccess()
+                }
+                Button(L10n.restorePurchasesButton) {
+                    viewModel.onTapRestorePurchases()
+                }
+                Button(L10n.cancelButton, role: .cancel) {}
+            } message: {
+                Text(L10n.purchaseDialogMessage(viewModel.selectedCharacter.title))
+            }
         }
         .onAppear {
             viewModel.onAppearForCreate()
@@ -165,10 +185,17 @@ private struct HabitCharacterSection: View {
                 )
             ) {
                 ForEach(selectableCharacters, id: \.rawValue) { character in
-                    Text(character.title).tag(character.rawValue)
+                    Text(characterLabel(character)).tag(character.rawValue)
                 }
             }
         }
+    }
+
+    private func characterLabel(_ character: CharacterType) -> String {
+        if character.isDefaultFree {
+            return character.title
+        }
+        return "\(character.title) \(L10n.purchaseLockedSuffix)"
     }
 }
 
@@ -314,6 +341,24 @@ private enum L10n {
     static let cancelButton = String(localized: "common.button.cancel", defaultValue: "キャンセル")
     static let errorTitle = String(localized: "common.error.title", defaultValue: "エラー")
     static let okButton = String(localized: "common.button.ok", defaultValue: "OK")
+    static let purchaseDialogTitle = String(localized: "habit_edit.purchase.dialog.title", defaultValue: "キャラクター解放")
+    static let purchaseAllAccessButton = String(localized: "habit_edit.purchase.button.all_access", defaultValue: "全キャラ解放を購入（500円）")
+    static let restorePurchasesButton = String(localized: "habit_edit.purchase.button.restore", defaultValue: "購入を復元")
+    static let purchaseLockedSuffix = String(localized: "habit_edit.purchase.locked_suffix", defaultValue: "（未解放）")
+
+    static func purchaseSelectedCharacterButton(_ characterTitle: String) -> String {
+        String(
+            localized: "habit_edit.purchase.button.selected",
+            defaultValue: "\(characterTitle)を解放（200円）"
+        )
+    }
+
+    static func purchaseDialogMessage(_ characterTitle: String) -> String {
+        String(
+            localized: "habit_edit.purchase.dialog.message",
+            defaultValue: "\(characterTitle)を保存するには解放が必要です。"
+        )
+    }
 }
 
 private enum FeatureFlags {

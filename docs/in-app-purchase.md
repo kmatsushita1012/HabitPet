@@ -127,10 +127,11 @@
 
 ### 0. 実装スコープ定義
 
-- 課金種別は **非消耗型（Non-Consumable）** のみで構成
+- 課金種別は **消費型 + 非消耗型** の2つで構成
 - 商品は2系統
-- 単体解放: `character.<id>`（例: `character.cat_03`）
+- 単体解放: `character.unlock.ticket`（消費型1商品）
 - 全解放: `characters.all_access`
+- 単体解放は「購入直後に現在選択中キャラへ付与」
 - 全解放購入済みの場合は、単体解放判定より常に優先
 
 ### 1. App Store Connect 設定
@@ -138,14 +139,14 @@
 - In-App Purchase を作成（審査提出可能な状態まで）
 - ローカライズ文言を準備（表示名・説明）
 - 価格設定
-- 単体解放: 200円
+- 単体解放チケット: 200円
 - 全解放: 500円
 - プロダクトIDを `docs` とコード内定数で同期管理
 
 ### 2. ドメインモデル追加（Shared）
 
 - 課金関連の最小モデルを追加
-- `PurchaseProduct`: productId / 種別（single, allAccess）/ 対象キャラID（任意）
+- `PurchaseProduct`: productId / 種別（singleTicket, allAccess）
 - `EntitlementState`: allAccessPurchased / purchasedCharacterIds
 - `PurchaseResult`: success / pending / cancelled / failed
 - 「このキャラを保存可能か」を判定するユースケースを追加
@@ -159,6 +160,7 @@
 - トランザクション検証（`VerificationResult`）
 - 復元（`AppStore.sync()`）
 - 購入状態の監視（`Transaction.currentEntitlements` + updates）
+- 単体チケット成功時に「選択中キャラID」をローカル付与して保存
 - 検証済みトランザクションのみを有効化し、未検証は無視
 
 ### 4. 永続化と起動時同期
@@ -194,7 +196,7 @@
 - 優先順位（全解放 > 単体）
 - 購入結果分岐（success/pending/cancelled/failed）
 - Integration Test（StoreKit Configuration）
-- 単体購入成功で対象キャラのみ解放
+- 単体チケット購入成功で保存対象キャラのみ解放
 - 全解放購入成功で全キャラ解放
 - 復元で状態復帰
 - UI Test
@@ -211,7 +213,7 @@
 
 ### 9. 実装順（推奨）
 
-1. Product ID と課金モデル定義
+1. Product ID（単体チケット1種 + 全解放1種）と課金モデル定義
 2. StoreKitClient と Entitlement 同期
 3. 保存時ゲート（未解放時モーダル）
 4. 復元導線

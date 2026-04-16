@@ -23,12 +23,16 @@ final class HabitEditViewModel {
     var yesterdayCountInput: String
     var isArchiveAlertPresented = false
     var isDeleteAlertPresented = false
+    var isPurchaseDialogPresented = false
+    var isPurchaseProcessing = false
     var errorMessage: String?
     var shouldDismiss = false
     var completionResult: CompletionResult?
 
     @ObservationIgnored
     @Dependency(\.habitUseCase) private var habitUseCase
+    @ObservationIgnored
+    @Dependency(\.characterPurchaseClient) private var characterPurchaseClient
 
     @ObservationIgnored
     private let dateFormatter: DateFormatter = {
@@ -76,7 +80,7 @@ final class HabitEditViewModel {
 
     func onChangeKind(_ kind: HabitKind) {
         selectedKind = kind
-        let candidates = CharacterType.candidates(for: kind)
+        let candidates = CharacterType.selectableForHabitEdit(kind: kind)
         if !candidates.contains(selectedCharacter) {
             selectedCharacter = candidates.first ?? .hamster
         }
@@ -105,39 +109,67 @@ final class HabitEditViewModel {
     func onTapSave() {
         Task {
             do {
-                let goalDeadlineString = dateFormatter.string(from: goalDeadline)
-                let goalPerDay = max(0, Int(goalPerDayInput) ?? 0)
-                let trimmedName = nameInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                let normalizedName = trimmedName.isEmpty ? nil : trimmedName
-
-                if var habit = editingHabit {
-                    habit.kind = selectedKind
-                    habit.character = selectedCharacter
-                    habit.name = normalizedName
-                    habit.goalDeadline = goalDeadlineString
-                    habit.goalPerDay = goalPerDay
-                    try habitUseCase.updateHabit(habit, now: Date())
-                    completionResult = .updated
-                } else {
-                    let draft = HabitDraft(
-                        kind: selectedKind,
-                        character: selectedCharacter,
-                        name: normalizedName,
-                        goalDeadline: goalDeadlineString,
-                        goalPerDay: goalPerDay,
-                        sortOrder: 0
-                    )
-                    let yesterdayCount = max(0, Int(yesterdayCountInput) ?? 0)
-                    _ = try habitUseCase.createHabit(
-                        draft,
-                        yesterdayCount: yesterdayCount,
-                        now: Date()
-                    )
-                    completionResult = .created
+                if selectedCharacter.isDefaultFree {
+                    try saveHabit()
+                    return
                 }
 
-                WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
-                shouldDismiss = true
+                let entitlements = await characterPurchaseClient.refreshEntitlements()
+                if entitlements.canUse(selectedCharacter) {
+                    try saveHabit()
+                } else {
+                    isPurchaseDialogPresented = true
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func onTapPurchaseSelectedCharacter() {
+        guard !isPurchaseProcessing else { return }
+        isPurchaseProcessing = true
+
+        Task {
+            defer { isPurchaseProcessing = false }
+            do {
+                let result = try await characterPurchaseClient.purchaseSingleUnlock(for: selectedCharacter)
+                try handlePurchaseResult(result)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func onTapPurchaseAllAccess() {
+        guard !isPurchaseProcessing else { return }
+        isPurchaseProcessing = true
+
+        Task {
+            defer { isPurchaseProcessing = false }
+            do {
+                let result = try await characterPurchaseClient.purchaseAllAccess()
+                try handlePurchaseResult(result)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func onTapRestorePurchases() {
+        guard !isPurchaseProcessing else { return }
+        isPurchaseProcessing = true
+
+        Task {
+            defer { isPurchaseProcessing = false }
+            do {
+                let entitlements = try await characterPurchaseClient.restore()
+                if entitlements.canUse(selectedCharacter) {
+                    isPurchaseDialogPresented = false
+                    try saveHabit()
+                } else {
+                    errorMessage = L10n.restoreNotPurchasedMessage
+                }
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -174,7 +206,59 @@ final class HabitEditViewModel {
 
     // Utilities
     var selectableCharacters: [CharacterType] {
-        CharacterType.candidates(for: selectedKind)
+        CharacterType.selectableForHabitEdit(kind: selectedKind)
+    }
+
+    var selectedCharacterRequiresPurchase: Bool {
+        selectedCharacter.isPurchasable && !selectedCharacter.isDefaultFree
+    }
+
+    private func handlePurchaseResult(_ result: CharacterPurchaseResult) throws {
+        switch result {
+        case .success:
+            isPurchaseDialogPresented = false
+            try saveHabit()
+        case .pending:
+            errorMessage = L10n.purchasePendingMessage
+        case .cancelled:
+            break
+        }
+    }
+
+    private func saveHabit() throws {
+        let goalDeadlineString = dateFormatter.string(from: goalDeadline)
+        let goalPerDay = max(0, Int(goalPerDayInput) ?? 0)
+        let trimmedName = nameInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedName = trimmedName.isEmpty ? nil : trimmedName
+
+        if var habit = editingHabit {
+            habit.kind = selectedKind
+            habit.character = selectedCharacter
+            habit.name = normalizedName
+            habit.goalDeadline = goalDeadlineString
+            habit.goalPerDay = goalPerDay
+            try habitUseCase.updateHabit(habit, now: Date())
+            completionResult = .updated
+        } else {
+            let draft = HabitDraft(
+                kind: selectedKind,
+                character: selectedCharacter,
+                name: normalizedName,
+                goalDeadline: goalDeadlineString,
+                goalPerDay: goalPerDay,
+                sortOrder: 0
+            )
+            let yesterdayCount = max(0, Int(yesterdayCountInput) ?? 0)
+            _ = try habitUseCase.createHabit(
+                draft,
+                yesterdayCount: yesterdayCount,
+                now: Date()
+            )
+            completionResult = .created
+        }
+
+        WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
+        shouldDismiss = true
     }
 
     private static func defaultGoalDeadline(calendar: Calendar) -> Date {
@@ -185,4 +269,15 @@ final class HabitEditViewModel {
         guard let raw else { return nil }
         return formatter.date(from: raw)
     }
+}
+
+private enum L10n {
+    static let purchasePendingMessage = String(
+        localized: "habit_edit.purchase.pending",
+        defaultValue: "購入処理は保留中です。承認後に再度保存してください。"
+    )
+    static let restoreNotPurchasedMessage = String(
+        localized: "habit_edit.purchase.restore.not_found",
+        defaultValue: "復元可能な購入が見つかりませんでした。"
+    )
 }

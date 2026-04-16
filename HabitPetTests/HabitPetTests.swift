@@ -53,4 +53,21 @@ struct HabitPetTests {
         #expect(habitStateLevel(goalPerDay: 3, recentDailyCounts: [4, 4, 0, 0, 0, 1, 0]) == 2)
     }
 
+    @Test func freeAndPaidCharacterClassification() async throws {
+        #expect(CharacterType.hamster.isDefaultFree)
+        #expect(CharacterType.rabbit.isDefaultFree)
+        #expect(!CharacterType.cat.isDefaultFree)
+        #expect(CharacterType.cat.isPurchasable)
+    }
+
+    @Test func selectableCharactersIncludePaidCharacterInHabitEdit() async throws {
+        let smoking = CharacterType.selectableForHabitEdit(kind: .nonSmoking)
+        let alcohol = CharacterType.selectableForHabitEdit(kind: .nonAlcohol)
+
+        #expect(smoking.contains(.hamster))
+        #expect(smoking.contains(.rabbit))
+        #expect(smoking.contains(.cat))
+        #expect(alcohol.contains(.cat))
+    }
+
 }

@@ -69,6 +69,25 @@ enum CharacterType: String, CaseIterable, Sendable, Codable, QueryBindable {
 }
 
 extension CharacterType {
+    static let defaultFreeCharacters: [CharacterType] = [.hamster, .rabbit]
+    static let purchasableCharacters: [CharacterType] = [.cat]
+
+    var isDefaultFree: Bool {
+        Self.defaultFreeCharacters.contains(self)
+    }
+
+    var isPurchasable: Bool {
+        Self.purchasableCharacters.contains(self)
+    }
+
+    static func selectableForHabitEdit(kind: HabitKind) -> [CharacterType] {
+        var characters = candidates(for: kind)
+        for premium in purchasableCharacters where !characters.contains(premium) {
+            characters.append(premium)
+        }
+        return characters
+    }
+
     static func candidates(for kind: HabitKind) -> [CharacterType] {
         switch kind {
         case .nonSmoking:
