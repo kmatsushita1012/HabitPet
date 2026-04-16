@@ -2,6 +2,19 @@ import Dependencies
 import Foundation
 import StoreKit
 
+struct CharacterPurchaseProduct: Sendable, Equatable, Identifiable {
+    enum Kind: Sendable, Equatable {
+        case singleUnlockTicket
+        case allAccess
+    }
+
+    let kind: Kind
+    let id: String
+    let title: String
+    let description: String
+    let displayPrice: String
+}
+
 struct CharacterEntitlementState: Sendable, Equatable {
     var allAccessPurchased: Bool
     var purchasedCharacterIDs: Set<String>
@@ -34,6 +47,7 @@ enum CharacterPurchaseError: LocalizedError {
 }
 
 protocol CharacterPurchaseClientProtocol: Sendable {
+    func loadProducts() async throws -> [CharacterPurchaseProduct]
     func entitlements() async -> CharacterEntitlementState
     func refreshEntitlements() async -> CharacterEntitlementState
     func purchaseSingleUnlock(for character: CharacterType) async throws -> CharacterPurchaseResult
@@ -42,14 +56,47 @@ protocol CharacterPurchaseClientProtocol: Sendable {
 }
 
 struct CharacterPurchaseClient: CharacterPurchaseClientProtocol, Sendable {
-    private enum ProductID {
+    enum ProductID {
         static let singleUnlockTicket = "habitpet.character.unlock.ticket"
         static let allAccess = "habitpet.characters.all_access"
+
+        static let all: [String] = [singleUnlockTicket, allAccess]
     }
 
     private enum DefaultsKey {
         static let purchasedCharacters = "iap.purchasedCharacterIDs"
         static let allAccess = "iap.allAccessPurchased"
+    }
+
+    func loadProducts() async throws -> [CharacterPurchaseProduct] {
+        let products = try await Product.products(for: ProductID.all)
+        var result: [CharacterPurchaseProduct] = []
+
+        if let single = products.first(where: { $0.id == ProductID.singleUnlockTicket }) {
+            result.append(
+                CharacterPurchaseProduct(
+                    kind: .singleUnlockTicket,
+                    id: single.id,
+                    title: single.displayName,
+                    description: single.description,
+                    displayPrice: single.displayPrice
+                )
+            )
+        }
+
+        if let allAccess = products.first(where: { $0.id == ProductID.allAccess }) {
+            result.append(
+                CharacterPurchaseProduct(
+                    kind: .allAccess,
+                    id: allAccess.id,
+                    title: allAccess.displayName,
+                    description: allAccess.description,
+                    displayPrice: allAccess.displayPrice
+                )
+            )
+        }
+
+        return result
     }
 
     func entitlements() async -> CharacterEntitlementState {
