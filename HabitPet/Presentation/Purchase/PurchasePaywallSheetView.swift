@@ -111,10 +111,15 @@ struct PurchaseManagementView: View {
                     LabeledContent(L10n.allAccessStatusLabel) {
                         Text(viewModel.entitlements.allAccessPurchased ? L10n.enabled : L10n.disabled)
                     }
-                    LabeledContent(L10n.unlockedCharactersLabel) {
-                        Text(viewModel.entitlements.purchasedCharacterIDs.isEmpty
-                             ? L10n.none
-                             : viewModel.entitlements.purchasedCharacterIDs.sorted().joined(separator: ", "))
+                    NavigationLink {
+                        PurchaseUnlockedCharactersView(
+                            purchasedCharacterIDs: viewModel.entitlements.purchasedCharacterIDs
+                        )
+                    } label: {
+                        LabeledContent(L10n.unlockedCharactersLabel) {
+                            Text(unlockedCharacterSummary(viewModel.entitlements.purchasedCharacterIDs))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
@@ -167,6 +172,38 @@ struct PurchaseManagementView: View {
         .onAppear {
             viewModel.onAppear()
         }
+    }
+
+    private func unlockedCharacterSummary(_ ids: Set<String>) -> String {
+        guard !ids.isEmpty else { return L10n.none }
+        return L10n.unlockedCharactersCount(ids.count)
+    }
+}
+
+private struct PurchaseUnlockedCharactersView: View {
+    let purchasedCharacterIDs: Set<String>
+
+    private var purchasedCharacterNames: [String] {
+        purchasedCharacterIDs
+            .map { CharacterType(rawValue: $0)?.title ?? $0 }
+            .sorted()
+    }
+
+    var body: some View {
+        List {
+            Section(L10n.unlockedCharactersListTitle) {
+                if purchasedCharacterNames.isEmpty {
+                    Text(L10n.none)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(purchasedCharacterNames, id: \.self) { name in
+                        Text(name)
+                    }
+                }
+            }
+        }
+        .navigationTitle(L10n.unlockedCharactersDetailTitle)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -265,6 +302,8 @@ private enum L10n {
     static let privacyButton = String(localized: "purchase.sheet.privacy", defaultValue: "プライバシーポリシー")
     static let allAccessStatusLabel = String(localized: "purchase.management.status.all", defaultValue: "全キャラ解放")
     static let unlockedCharactersLabel = String(localized: "purchase.management.status.characters", defaultValue: "個別解放キャラ")
+    static let unlockedCharactersListTitle = String(localized: "purchase.management.characters.list", defaultValue: "購入済みキャラクター")
+    static let unlockedCharactersDetailTitle = String(localized: "purchase.management.characters.detail_title", defaultValue: "購入済みキャラ一覧")
     static let enabled = String(localized: "common.state.enabled", defaultValue: "有効")
     static let disabled = String(localized: "common.state.disabled", defaultValue: "未購入")
     static let none = String(localized: "common.none", defaultValue: "なし")
@@ -275,5 +314,9 @@ private enum L10n {
 
     static func selectedCharacter(_ characterTitle: String) -> String {
         String(localized: "purchase.sheet.selected", defaultValue: "選択中: \(characterTitle)")
+    }
+
+    static func unlockedCharactersCount(_ count: Int) -> String {
+        String(localized: "purchase.management.characters.count", defaultValue: "\(count)件")
     }
 }
