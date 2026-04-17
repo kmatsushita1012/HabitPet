@@ -27,7 +27,11 @@ final class HabitEditViewModel {
     var errorMessage: String?
     var shouldDismiss = false
     var completionResult: CompletionResult?
-    var entitlements = CharacterEntitlementState(allAccessPurchased: false, purchasedCharacterIDs: [])
+    var entitlements = CharacterEntitlementState(
+        allAccessPurchased: false,
+        purchasedCharacterIDs: [],
+        remainingSingleUnlockTickets: 0
+    )
 
     @ObservationIgnored
     @Dependency(\.habitUseCase) private var habitUseCase
