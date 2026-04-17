@@ -152,7 +152,7 @@
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
             uuid = "2D3413A9-A471-4E88-A8FB-285D32FC5672"
-            shouldBeEnabled = "Yes"
+            shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "HabitPet/Presentation/HabitEdit/HabitEditViewModel.swift"
@@ -160,7 +160,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "78"
             endingLineNumber = "78"
-            landmarkName = "onChangeCharacter(_:)"
+            landmarkName = "onAppearForCreate()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
