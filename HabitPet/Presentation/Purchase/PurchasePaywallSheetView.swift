@@ -339,7 +339,7 @@ private enum L10n {
     static let singleUnlockType = String(localized: "purchase.sheet.type.single", defaultValue: "消費型（都度購入）")
     static let allAccessType = String(localized: "purchase.sheet.type.all", defaultValue: "買い切り（永続解放）")
     static let allAccessButton = String(localized: "purchase.sheet.button.all", defaultValue: "使い放題を購入")
-    static let stockTicketButton = String(localized: "purchase.sheet.button.ticket.stock", defaultValue: "チケットを購入してストック")
+    static let stockTicketButton = String(localized: "purchase.sheet.button.ticket.stock", defaultValue: "チケットを購入")
     static let restoreButton = String(localized: "purchase.sheet.button.restore", defaultValue: "購入を復元")
     static let closeButton = String(localized: "common.button.close", defaultValue: "閉じる")
     static let errorTitle = String(localized: "common.error.title", defaultValue: "エラー")
@@ -360,7 +360,7 @@ private enum L10n {
     }
 
     static func selectedCharacter(_ characterTitle: String) -> String {
-        String(localized: "purchase.sheet.selected", defaultValue: "選択中: \(characterTitle)")
+        String(localized: "purchase.sheet.selected", defaultValue: "有料のキャラクター1体が利用可能になります")
     }
 
     static func unlockedCharactersCount(_ count: Int) -> String {
