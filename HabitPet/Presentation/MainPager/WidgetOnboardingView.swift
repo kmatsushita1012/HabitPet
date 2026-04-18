@@ -1,3 +1,4 @@
+import AVFoundation
 import AVKit
 import SwiftUI
 
@@ -130,12 +131,14 @@ private struct LoopingVideoPlayerView: View {
                        )
                     .allowsHitTesting(false)
                     .onAppear {
+                        configureAudioSession()
                         player.play()
                         installLoopObserverIfNeeded(for: player)
                     }
                     .onDisappear {
                         player.pause()
                         removeLoopObserver()
+                        deactivateAudioSession()
                     }
             } else {
                 Color.clear
@@ -147,6 +150,7 @@ private struct LoopingVideoPlayerView: View {
             guard let url = Bundle.main.url(forResource: resourceName, withExtension: resourceExtension) else { return }
             let createdPlayer = AVPlayer(url: url)
             createdPlayer.isMuted = true
+            createdPlayer.volume = 0
             player = createdPlayer
             self.ratio = (try? await getAspectRatio(from: createdPlayer)) ?? ratio
         }
@@ -168,6 +172,17 @@ private struct LoopingVideoPlayerView: View {
         guard let endObserver else { return }
         NotificationCenter.default.removeObserver(endObserver)
         self.endObserver = nil
+    }
+
+    private func configureAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.ambient, mode: .default, options: [.mixWithOthers])
+        try? session.setActive(true)
+    }
+
+    private func deactivateAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setActive(false, options: [.notifyOthersOnDeactivation])
     }
     
     private func getAspectRatio(from player: AVPlayer) async throws -> CGFloat? {

@@ -7,7 +7,7 @@ import WidgetKit
 @Observable
 final class HabitEditViewModel {
     enum CompletionResult: Equatable {
-        case created
+        case created(Habit.ID)
         case updated
         case archived
         case deleted
@@ -145,7 +145,7 @@ final class HabitEditViewModel {
                 let entitlements = await characterPurchaseClient.refreshEntitlements()
                 self.entitlements = entitlements
                 if entitlements.remainingSingleUnlockTickets > 0 {
-                    let outcome = await characterPurchaseClient.purchaseSingleUnlock(for: selectedCharacter)
+                    let outcome = try await characterPurchaseClient.purchaseSingleUnlock(for: selectedCharacter)
                     if outcome == .success {
                         let latestEntitlements = await characterPurchaseClient.refreshEntitlements()
                         self.entitlements = latestEntitlements
@@ -257,12 +257,12 @@ final class HabitEditViewModel {
                 sortOrder: 0
             )
             let yesterdayCount = max(0, Int(yesterdayCountInput) ?? 0)
-            _ = try habitUseCase.createHabit(
+            let createdHabit = try habitUseCase.createHabit(
                 draft,
                 yesterdayCount: yesterdayCount,
                 now: Date()
             )
-            completionResult = .created
+            completionResult = .created(createdHabit.id)
         }
 
         WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")
