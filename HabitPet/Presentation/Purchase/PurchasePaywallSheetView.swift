@@ -360,7 +360,7 @@ private enum L10n {
     }
 
     static func selectedCharacter(_ characterTitle: String) -> String {
-        String(localized: "purchase.sheet.selected", defaultValue: "有料のキャラクター1体が利用可能になります")
+        String(localized: "purchase.sheet.selected", defaultValue: "選択中: \(characterTitle)")
     }
 
     static func unlockedCharactersCount(_ count: Int) -> String {
