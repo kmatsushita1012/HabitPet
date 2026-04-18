@@ -57,6 +57,7 @@ enum CharacterType: String, CaseIterable, Sendable, Codable, QueryBindable {
     case fox
     case cat
     case rabbit
+    case panda
 
     var title: String {
         switch self {
@@ -64,13 +65,14 @@ enum CharacterType: String, CaseIterable, Sendable, Codable, QueryBindable {
         case .fox: "キツネ"
         case .cat: "ネコ"
         case .rabbit: "ウサギ"
+        case .panda: "パンダ"
         }
     }
 }
 
 extension CharacterType {
     static let defaultFreeCharacters: [CharacterType] = [.hamster, .rabbit]
-    static let purchasableCharacters: [CharacterType] = [.cat]
+    static let purchasableCharacters: [CharacterType] = [.cat, .panda]
 
     var isDefaultFree: Bool {
         Self.defaultFreeCharacters.contains(self)

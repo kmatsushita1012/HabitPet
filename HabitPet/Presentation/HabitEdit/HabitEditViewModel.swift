@@ -7,7 +7,7 @@ import WidgetKit
 @Observable
 final class HabitEditViewModel {
     enum CompletionResult: Equatable {
-        case created
+        case created(Habit.ID)
         case updated
         case archived
         case deleted
@@ -24,10 +24,15 @@ final class HabitEditViewModel {
     var isArchiveAlertPresented = false
     var isDeleteAlertPresented = false
     var isPurchaseSheetPresented = false
+    var isUseTicketConfirmationAlertPresented = false
     var errorMessage: String?
     var shouldDismiss = false
     var completionResult: CompletionResult?
-    var entitlements = CharacterEntitlementState(allAccessPurchased: false, purchasedCharacterIDs: [])
+    var entitlements = CharacterEntitlementState(
+        allAccessPurchased: false,
+        purchasedCharacterIDs: [],
+        remainingSingleUnlockTickets: 0
+    )
 
     @ObservationIgnored
     @Dependency(\.habitUseCase) private var habitUseCase
@@ -123,6 +128,8 @@ final class HabitEditViewModel {
                 self.entitlements = entitlements
                 if entitlements.canUse(selectedCharacter) {
                     try saveHabit()
+                } else if entitlements.remainingSingleUnlockTickets > 0 {
+                    isUseTicketConfirmationAlertPresented = true
                 } else {
                     isPurchaseSheetPresented = true
                 }
@@ -130,6 +137,38 @@ final class HabitEditViewModel {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    func onTapUseTicketConfirmationOK() {
+        Task {
+            do {
+                let entitlements = await characterPurchaseClient.refreshEntitlements()
+                self.entitlements = entitlements
+                if entitlements.remainingSingleUnlockTickets > 0 {
+                    let outcome = try await characterPurchaseClient.purchaseSingleUnlock(for: selectedCharacter)
+                    if outcome == .success {
+                        let latestEntitlements = await characterPurchaseClient.refreshEntitlements()
+                        self.entitlements = latestEntitlements
+                        if latestEntitlements.canUse(selectedCharacter) {
+                            isUseTicketConfirmationAlertPresented = false
+                            try saveHabit()
+                            return
+                        }
+                    }
+                }
+
+                errorMessage = String(
+                    localized: "habit_edit.purchase.restore.not_found",
+                    defaultValue: "復元可能な購入が見つかりませんでした。"
+                )
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func onTapUseTicketConfirmationCancel() {
+        isUseTicketConfirmationAlertPresented = false
     }
 
     func onPurchaseCompletedFromSheet() {
@@ -218,12 +257,12 @@ final class HabitEditViewModel {
                 sortOrder: 0
             )
             let yesterdayCount = max(0, Int(yesterdayCountInput) ?? 0)
-            _ = try habitUseCase.createHabit(
+            let createdHabit = try habitUseCase.createHabit(
                 draft,
                 yesterdayCount: yesterdayCount,
                 now: Date()
             )
-            completionResult = .created
+            completionResult = .created(createdHabit.id)
         }
 
         WidgetCenter.shared.reloadTimelines(ofKind: "HabitPetWidget")

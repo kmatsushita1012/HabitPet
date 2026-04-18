@@ -83,6 +83,12 @@ final class MainPagerViewModel {
         isCreatePresented = true
     }
 
+    func onCreateHabitCompleted(_ habitID: Habit.ID) {
+        pendingSelectionHabitID = habitID
+        isCreatePresented = false
+        reloadData()
+    }
+
     func onTapPurchaseManagement() {
         isPurchaseManagementPresented = true
     }

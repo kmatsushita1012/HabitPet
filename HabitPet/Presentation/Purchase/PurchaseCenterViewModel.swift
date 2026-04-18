@@ -14,7 +14,11 @@ final class PurchaseCenterViewModel {
 
     var selectedCharacter: CharacterType?
     var products: [CharacterPurchaseProduct] = []
-    var entitlements = CharacterEntitlementState(allAccessPurchased: false, purchasedCharacterIDs: [])
+    var entitlements = CharacterEntitlementState(
+        allAccessPurchased: false,
+        purchasedCharacterIDs: [],
+        remainingSingleUnlockTickets: 0
+    )
     var isLoading = false
     var isProcessing = false
     var errorMessage: String?
@@ -37,6 +41,14 @@ final class PurchaseCenterViewModel {
     var selectedCharacterIsUnlocked: Bool {
         guard let selectedCharacter else { return false }
         return entitlements.canUse(selectedCharacter)
+    }
+
+    var remainingSingleUnlockTickets: Int {
+        entitlements.remainingSingleUnlockTickets
+    }
+
+    var shouldUseTicketForSelectedCharacter: Bool {
+        remainingSingleUnlockTickets > 0
     }
 
     func onAppear() {
@@ -65,6 +77,21 @@ final class PurchaseCenterViewModel {
 
         do {
             let result = try await purchaseClient.purchaseSingleUnlock(for: selectedCharacter)
+            entitlements = await purchaseClient.refreshEntitlements()
+            return map(result)
+        } catch {
+            errorMessage = error.localizedDescription
+            return .failed
+        }
+    }
+
+    func purchaseSingleUnlockTicket() async -> Outcome {
+        guard !isProcessing else { return .failed }
+        isProcessing = true
+        defer { isProcessing = false }
+
+        do {
+            let result = try await purchaseClient.purchaseSingleUnlockTicket()
             entitlements = await purchaseClient.refreshEntitlements()
             return map(result)
         } catch {

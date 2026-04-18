@@ -18,6 +18,7 @@ struct CharacterPurchaseProduct: Sendable, Equatable, Identifiable {
 struct CharacterEntitlementState: Sendable, Equatable {
     var allAccessPurchased: Bool
     var purchasedCharacterIDs: Set<String>
+    var remainingSingleUnlockTickets: Int
 
     func canUse(_ character: CharacterType) -> Bool {
         if character.isDefaultFree { return true }
@@ -50,6 +51,7 @@ protocol CharacterPurchaseClientProtocol: Sendable {
     func loadProducts() async throws -> [CharacterPurchaseProduct]
     func entitlements() async -> CharacterEntitlementState
     func refreshEntitlements() async -> CharacterEntitlementState
+    func purchaseSingleUnlockTicket() async throws -> CharacterPurchaseResult
     func purchaseSingleUnlock(for character: CharacterType) async throws -> CharacterPurchaseResult
     func purchaseAllAccess() async throws -> CharacterPurchaseResult
     func restore() async throws -> CharacterEntitlementState
@@ -66,6 +68,9 @@ struct CharacterPurchaseClient: CharacterPurchaseClientProtocol, Sendable {
     private enum DefaultsKey {
         static let purchasedCharacters = "iap.purchasedCharacterIDs"
         static let allAccess = "iap.allAccessPurchased"
+        static let singleUnlockTicketCount = "iap.singleUnlockTicketCount"
+        static let pendingSingleUnlockCharacterID = "iap.pendingSingleUnlockCharacterID"
+        static let processedSingleUnlockTransactionIDs = "iap.processedSingleUnlockTransactionIDs"
     }
 
     func loadProducts() async throws -> [CharacterPurchaseProduct] {
@@ -102,11 +107,14 @@ struct CharacterPurchaseClient: CharacterPurchaseClientProtocol, Sendable {
     func entitlements() async -> CharacterEntitlementState {
         CharacterEntitlementState(
             allAccessPurchased: UserDefaults.standard.bool(forKey: DefaultsKey.allAccess),
-            purchasedCharacterIDs: purchasedCharacterIDs()
+            purchasedCharacterIDs: purchasedCharacterIDs(),
+            remainingSingleUnlockTickets: singleUnlockTicketCount()
         )
     }
 
     func refreshEntitlements() async -> CharacterEntitlementState {
+        await reconcileUnfinishedSingleUnlockTransactions()
+
         var allAccessPurchased = false
 
         for await result in Transaction.currentEntitlements {
@@ -120,7 +128,8 @@ struct CharacterPurchaseClient: CharacterPurchaseClientProtocol, Sendable {
 
         return CharacterEntitlementState(
             allAccessPurchased: allAccessPurchased,
-            purchasedCharacterIDs: purchasedCharacterIDs()
+            purchasedCharacterIDs: purchasedCharacterIDs(),
+            remainingSingleUnlockTickets: singleUnlockTicketCount()
         )
     }
 
@@ -129,6 +138,45 @@ struct CharacterPurchaseClient: CharacterPurchaseClientProtocol, Sendable {
             return .success
         }
 
+        do {
+            let product = try await loadProduct(id: ProductID.singleUnlockTicket)
+
+            if consumeSingleUnlockTicketAndUnlock(character.rawValue) {
+                return .success
+            }
+
+            setPendingSingleUnlockCharacterID(character.rawValue)
+            let result = try await product.purchase()
+
+            switch result {
+            case .success(let verification):
+                guard case .verified(let transaction) = verification else {
+                    throw CharacterPurchaseError.verificationFailed
+                }
+                if !isProcessedSingleUnlockTransaction(id: transaction.id) {
+                    addSingleUnlockTickets(1)
+                    markProcessedSingleUnlockTransaction(id: transaction.id)
+                }
+                _ = consumeSingleUnlockTicketAndUnlock(character.rawValue)
+                clearPendingSingleUnlockCharacterID()
+                await transaction.finish()
+                return .success
+            case .pending:
+                return .pending
+            case .userCancelled:
+                clearPendingSingleUnlockCharacterID()
+                return .cancelled
+            @unknown default:
+                clearPendingSingleUnlockCharacterID()
+                return .cancelled
+            }
+        } catch {
+            clearPendingSingleUnlockCharacterID()
+            throw error
+        }
+    }
+
+    func purchaseSingleUnlockTicket() async throws -> CharacterPurchaseResult {
         let product = try await loadProduct(id: ProductID.singleUnlockTicket)
         let result = try await product.purchase()
 
@@ -137,8 +185,11 @@ struct CharacterPurchaseClient: CharacterPurchaseClientProtocol, Sendable {
             guard case .verified(let transaction) = verification else {
                 throw CharacterPurchaseError.verificationFailed
             }
+            if !isProcessedSingleUnlockTransaction(id: transaction.id) {
+                addSingleUnlockTickets(1)
+                markProcessedSingleUnlockTransaction(id: transaction.id)
+            }
             await transaction.finish()
-            persistPurchasedCharacterID(character.rawValue)
             return .success
         case .pending:
             return .pending
@@ -188,10 +239,75 @@ struct CharacterPurchaseClient: CharacterPurchaseClientProtocol, Sendable {
         return Set(rawValues)
     }
 
+    private func singleUnlockTicketCount() -> Int {
+        max(0, UserDefaults.standard.integer(forKey: DefaultsKey.singleUnlockTicketCount))
+    }
+
+    private func addSingleUnlockTickets(_ count: Int) {
+        guard count > 0 else { return }
+        let current = singleUnlockTicketCount()
+        UserDefaults.standard.set(current + count, forKey: DefaultsKey.singleUnlockTicketCount)
+    }
+
+    private func consumeSingleUnlockTicketAndUnlock(_ characterRawValue: String) -> Bool {
+        let current = singleUnlockTicketCount()
+        guard current > 0 else { return false }
+        UserDefaults.standard.set(current - 1, forKey: DefaultsKey.singleUnlockTicketCount)
+        persistPurchasedCharacterID(characterRawValue)
+        return true
+    }
+
     private func persistPurchasedCharacterID(_ rawValue: String) {
         var ids = purchasedCharacterIDs()
         ids.insert(rawValue)
         UserDefaults.standard.set(Array(ids), forKey: DefaultsKey.purchasedCharacters)
+    }
+
+    private func pendingSingleUnlockCharacterID() -> String? {
+        UserDefaults.standard.string(forKey: DefaultsKey.pendingSingleUnlockCharacterID)
+    }
+
+    private func setPendingSingleUnlockCharacterID(_ rawValue: String) {
+        UserDefaults.standard.set(rawValue, forKey: DefaultsKey.pendingSingleUnlockCharacterID)
+    }
+
+    private func clearPendingSingleUnlockCharacterID() {
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pendingSingleUnlockCharacterID)
+    }
+
+    private func processedSingleUnlockTransactionIDs() -> Set<String> {
+        let rawValues = UserDefaults.standard.stringArray(forKey: DefaultsKey.processedSingleUnlockTransactionIDs) ?? []
+        return Set(rawValues)
+    }
+
+    private func isProcessedSingleUnlockTransaction(id: UInt64) -> Bool {
+        processedSingleUnlockTransactionIDs().contains(String(id))
+    }
+
+    private func markProcessedSingleUnlockTransaction(id: UInt64) {
+        var ids = processedSingleUnlockTransactionIDs()
+        ids.insert(String(id))
+        UserDefaults.standard.set(Array(ids), forKey: DefaultsKey.processedSingleUnlockTransactionIDs)
+    }
+
+    private func reconcileUnfinishedSingleUnlockTransactions() async {
+        for await result in Transaction.unfinished {
+            guard case .verified(let transaction) = result else { continue }
+            guard transaction.productID == ProductID.singleUnlockTicket else { continue }
+
+            if isProcessedSingleUnlockTransaction(id: transaction.id) {
+                await transaction.finish()
+                continue
+            }
+
+            addSingleUnlockTickets(1)
+            markProcessedSingleUnlockTransaction(id: transaction.id)
+            if let pendingCharacterID = pendingSingleUnlockCharacterID() {
+                _ = consumeSingleUnlockTicketAndUnlock(pendingCharacterID)
+                clearPendingSingleUnlockCharacterID()
+            }
+            await transaction.finish()
+        }
     }
 }
 

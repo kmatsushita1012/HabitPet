@@ -150,7 +150,9 @@ struct MainPagerView: View {
             }
         ) {
             HabitEditView(viewModel: HabitEditViewModel(habit: nil)) { completionResult in
-                guard completionResult == .created, !hasShownWidgetOnboarding else { return }
+                guard case .created(let habitID) = completionResult else { return }
+                viewModel.onCreateHabitCompleted(habitID)
+                guard !hasShownWidgetOnboarding else { return }
                 shouldPresentWidgetOnboardingAfterCreate = true
             }
         }

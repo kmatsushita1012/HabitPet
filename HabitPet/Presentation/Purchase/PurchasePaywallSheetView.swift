@@ -15,7 +15,10 @@ struct PurchasePaywallSheetView: View {
 
         NavigationStack {
             List {
-                PurchaseHeaderSection(selectedCharacter: viewModel.selectedCharacter)
+                PurchaseHeaderSection(
+                    selectedCharacter: viewModel.selectedCharacter,
+                    remainingTicketCount: viewModel.remainingSingleUnlockTickets
+                )
 
                 if let singleUnlockProduct = viewModel.singleUnlockProduct,
                    let selectedCharacter = viewModel.selectedCharacter,
@@ -25,7 +28,10 @@ struct PurchasePaywallSheetView: View {
                         description: singleUnlockProduct.description,
                         purchaseType: L10n.singleUnlockType,
                         price: singleUnlockProduct.displayPrice,
-                        buttonTitle: L10n.singleUnlockButton(selectedCharacter.title)
+                        buttonTitle: viewModel.shouldUseTicketForSelectedCharacter
+                            ? L10n.singleUnlockWithTicketButton(selectedCharacter.title)
+                            : L10n.singleUnlockButton(selectedCharacter.title),
+                        isPrimaryButton: true
                     ) {
                         Task {
                             let outcome = await viewModel.purchaseSelectedCharacter()
@@ -44,7 +50,8 @@ struct PurchasePaywallSheetView: View {
                         description: allAccessProduct.description,
                         purchaseType: L10n.allAccessType,
                         price: allAccessProduct.displayPrice,
-                        buttonTitle: L10n.allAccessButton
+                        buttonTitle: L10n.allAccessButton,
+                        isPrimaryButton: false
                     ) {
                         Task {
                             let outcome = await viewModel.purchaseAllAccess()
@@ -111,11 +118,35 @@ struct PurchaseManagementView: View {
                     LabeledContent(L10n.allAccessStatusLabel) {
                         Text(viewModel.entitlements.allAccessPurchased ? L10n.enabled : L10n.disabled)
                     }
-                    LabeledContent(L10n.unlockedCharactersLabel) {
-                        Text(viewModel.entitlements.purchasedCharacterIDs.isEmpty
-                             ? L10n.none
-                             : viewModel.entitlements.purchasedCharacterIDs.sorted().joined(separator: ", "))
+                    LabeledContent(L10n.ticketCountLabel) {
+                        Text(L10n.ticketCountValue(viewModel.remainingSingleUnlockTickets))
                     }
+                    NavigationLink {
+                        PurchaseUnlockedCharactersView(
+                            purchasedCharacterIDs: viewModel.entitlements.purchasedCharacterIDs
+                        )
+                    } label: {
+                        LabeledContent(L10n.unlockedCharactersLabel) {
+                            Text(unlockedCharacterSummary(viewModel.entitlements.purchasedCharacterIDs))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                if let singleUnlockProduct = viewModel.singleUnlockProduct, !viewModel.entitlements.allAccessPurchased {
+                    PurchaseProductRow(
+                        title: singleUnlockProduct.title,
+                        description: singleUnlockProduct.description,
+                        purchaseType: L10n.singleUnlockType,
+                        price: singleUnlockProduct.displayPrice,
+                        buttonTitle: L10n.stockTicketButton,
+                        isPrimaryButton: true
+                    ) {
+                        Task {
+                            _ = await viewModel.purchaseSingleUnlockTicket()
+                        }
+                    }
+                    .disabled(viewModel.isProcessing)
                 }
 
                 if let allAccessProduct = viewModel.allAccessProduct, !viewModel.entitlements.allAccessPurchased {
@@ -124,7 +155,8 @@ struct PurchaseManagementView: View {
                         description: allAccessProduct.description,
                         purchaseType: L10n.allAccessType,
                         price: allAccessProduct.displayPrice,
-                        buttonTitle: L10n.allAccessButton
+                        buttonTitle: L10n.allAccessButton,
+                        isPrimaryButton: false
                     ) {
                         Task {
                             _ = await viewModel.purchaseAllAccess()
@@ -168,10 +200,43 @@ struct PurchaseManagementView: View {
             viewModel.onAppear()
         }
     }
+
+    private func unlockedCharacterSummary(_ ids: Set<String>) -> String {
+        guard !ids.isEmpty else { return L10n.none }
+        return L10n.unlockedCharactersCount(ids.count)
+    }
+}
+
+private struct PurchaseUnlockedCharactersView: View {
+    let purchasedCharacterIDs: Set<String>
+
+    private var purchasedCharacterNames: [String] {
+        purchasedCharacterIDs
+            .map { CharacterType(rawValue: $0)?.title ?? $0 }
+            .sorted()
+    }
+
+    var body: some View {
+        List {
+            Section(L10n.unlockedCharactersListTitle) {
+                if purchasedCharacterNames.isEmpty {
+                    Text(L10n.none)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(purchasedCharacterNames, id: \.self) { name in
+                        Text(name)
+                    }
+                }
+            }
+        }
+        .navigationTitle(L10n.unlockedCharactersDetailTitle)
+        .navigationBarTitleDisplayMode(.inline)
+    }
 }
 
 private struct PurchaseHeaderSection: View {
     let selectedCharacter: CharacterType?
+    let remainingTicketCount: Int
 
     var body: some View {
         Section {
@@ -180,6 +245,9 @@ private struct PurchaseHeaderSection: View {
                 Text(L10n.selectedCharacter(selectedCharacter.title))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+            LabeledContent(L10n.ticketCountLabel) {
+                Text(L10n.ticketCountValue(remainingTicketCount))
             }
         }
     }
@@ -191,6 +259,7 @@ private struct PurchaseProductRow: View {
     let purchaseType: String
     let price: String
     let buttonTitle: String
+    let isPrimaryButton: Bool
     let onTapPurchase: () -> Void
 
     var body: some View {
@@ -208,8 +277,21 @@ private struct PurchaseProductRow: View {
                     Text(price)
                 }
                 PurchaseLegalLinksInline()
-                Button(buttonTitle, action: onTapPurchase)
+                if isPrimaryButton {
+                    Button(action: onTapPurchase) {
+                        Text(buttonTitle)
+                            .font(.title3.bold())
+                            .padding(8)
+                    }
                     .buttonStyle(.borderedProminent)
+                } else {
+                    Button(action: onTapPurchase) {
+                        Text(buttonTitle)
+                            .font(.title3.bold())
+                            .padding(8)
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
         }
     }
@@ -256,7 +338,8 @@ private enum L10n {
     static let priceLabel = String(localized: "purchase.sheet.price", defaultValue: "価格")
     static let singleUnlockType = String(localized: "purchase.sheet.type.single", defaultValue: "消費型（都度購入）")
     static let allAccessType = String(localized: "purchase.sheet.type.all", defaultValue: "買い切り（永続解放）")
-    static let allAccessButton = String(localized: "purchase.sheet.button.all", defaultValue: "購入")
+    static let allAccessButton = String(localized: "purchase.sheet.button.all", defaultValue: "使い放題を購入")
+    static let stockTicketButton = String(localized: "purchase.sheet.button.ticket.stock", defaultValue: "チケットを購入")
     static let restoreButton = String(localized: "purchase.sheet.button.restore", defaultValue: "購入を復元")
     static let closeButton = String(localized: "common.button.close", defaultValue: "閉じる")
     static let errorTitle = String(localized: "common.error.title", defaultValue: "エラー")
@@ -264,16 +347,31 @@ private enum L10n {
     static let termsButton = String(localized: "purchase.sheet.terms", defaultValue: "利用規約（EULA）")
     static let privacyButton = String(localized: "purchase.sheet.privacy", defaultValue: "プライバシーポリシー")
     static let allAccessStatusLabel = String(localized: "purchase.management.status.all", defaultValue: "全キャラ解放")
+    static let ticketCountLabel = String(localized: "purchase.management.status.tickets", defaultValue: "残りチケット")
     static let unlockedCharactersLabel = String(localized: "purchase.management.status.characters", defaultValue: "個別解放キャラ")
+    static let unlockedCharactersListTitle = String(localized: "purchase.management.characters.list", defaultValue: "購入済みキャラクター")
+    static let unlockedCharactersDetailTitle = String(localized: "purchase.management.characters.detail_title", defaultValue: "購入済みキャラ一覧")
     static let enabled = String(localized: "common.state.enabled", defaultValue: "有効")
     static let disabled = String(localized: "common.state.disabled", defaultValue: "未購入")
     static let none = String(localized: "common.none", defaultValue: "なし")
 
     static func singleUnlockButton(_ characterTitle: String) -> String {
-        String(localized: "purchase.sheet.button.single", defaultValue: "\(characterTitle)を解放")
+        String(localized: "purchase.sheet.button.single", defaultValue: "\(characterTitle)を購入")
     }
 
     static func selectedCharacter(_ characterTitle: String) -> String {
         String(localized: "purchase.sheet.selected", defaultValue: "選択中: \(characterTitle)")
+    }
+
+    static func unlockedCharactersCount(_ count: Int) -> String {
+        String(localized: "purchase.management.characters.count", defaultValue: "\(count)件")
+    }
+
+    static func ticketCountValue(_ count: Int) -> String {
+        String(localized: "purchase.management.tickets.count", defaultValue: "\(count)枚")
+    }
+
+    static func singleUnlockWithTicketButton(_ characterTitle: String) -> String {
+        String(localized: "purchase.sheet.button.single.ticket", defaultValue: "チケットで\(characterTitle)を解放")
     }
 }
