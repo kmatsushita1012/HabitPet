@@ -24,6 +24,7 @@ final class HabitEditViewModel {
     var isArchiveAlertPresented = false
     var isDeleteAlertPresented = false
     var isPurchaseSheetPresented = false
+    var isUseTicketConfirmationAlertPresented = false
     var errorMessage: String?
     var shouldDismiss = false
     var completionResult: CompletionResult?
@@ -127,6 +128,8 @@ final class HabitEditViewModel {
                 self.entitlements = entitlements
                 if entitlements.canUse(selectedCharacter) {
                     try saveHabit()
+                } else if entitlements.remainingSingleUnlockTickets > 0 {
+                    isUseTicketConfirmationAlertPresented = true
                 } else {
                     isPurchaseSheetPresented = true
                 }
@@ -134,6 +137,38 @@ final class HabitEditViewModel {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    func onTapUseTicketConfirmationOK() {
+        Task {
+            do {
+                let entitlements = await characterPurchaseClient.refreshEntitlements()
+                self.entitlements = entitlements
+                if entitlements.remainingSingleUnlockTickets > 0 {
+                    let outcome = await characterPurchaseClient.purchaseSingleUnlock(for: selectedCharacter)
+                    if outcome == .success {
+                        let latestEntitlements = await characterPurchaseClient.refreshEntitlements()
+                        self.entitlements = latestEntitlements
+                        if latestEntitlements.canUse(selectedCharacter) {
+                            isUseTicketConfirmationAlertPresented = false
+                            try saveHabit()
+                            return
+                        }
+                    }
+                }
+
+                errorMessage = String(
+                    localized: "habit_edit.purchase.restore.not_found",
+                    defaultValue: "復元可能な購入が見つかりませんでした。"
+                )
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func onTapUseTicketConfirmationCancel() {
+        isUseTicketConfirmationAlertPresented = false
     }
 
     func onPurchaseCompletedFromSheet() {

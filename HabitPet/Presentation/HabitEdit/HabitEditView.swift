@@ -95,6 +95,27 @@ struct HabitEditView: View {
             } message: {
                 Text(L10n.archiveAlertMessage)
             }
+            .alert(
+                String(
+                    localized: "habit_edit.purchase.ticket.confirm.title",
+                    defaultValue: "チケットを使って利用可能にしますか？"
+                ),
+                isPresented: $viewModel.isUseTicketConfirmationAlertPresented
+            ) {
+                Button(L10n.okButton) {
+                    viewModel.onTapUseTicketConfirmationOK()
+                }
+                Button(L10n.cancelButton, role: .cancel) {
+                    viewModel.onTapUseTicketConfirmationCancel()
+                }
+            } message: {
+                Text(
+                    String(
+                        localized: "habit_edit.purchase.ticket.confirm.message",
+                        defaultValue: "チケットを使って\(viewModel.selectedCharacter.title)を利用可能にします。よろしいですか？"
+                    )
+                )
+            }
             .alert(L10n.deleteAlertTitle, isPresented: $viewModel.isDeleteAlertPresented) {
                 Button(L10n.deleteButton, role: .destructive) {
                     viewModel.onTapDelete()
